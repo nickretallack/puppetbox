@@ -1,6 +1,16 @@
+port = 5000
+db_uri = 'tcp://localhost/puppetbox'
+
 express = require 'express'
 Faye = require 'faye'
-port = 5000
+pg = require 'pg'
+
+pg_client = new pg.Client db_uri
+pg_client.connect()
+db = require './library/standard/postgres-helper'
+db.set_db pg_client
+
+db.query "select 5", -> console.log JSON.stringify arguments
 
 app = express.createServer()
 app.use express.static __dirname
