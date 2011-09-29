@@ -1,6 +1,7 @@
 (function() {
-  var Thing, default_position, socket, things;
+  var Thing, default_position, room_name, socket, things;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+  room_name = window.location.pathname.slice(1);
   things = {};
   default_position = function() {
     return {

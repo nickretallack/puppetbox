@@ -1,9 +1,9 @@
+room_name = window.location.pathname.slice 1
 things = {}
 
 default_position = ->
     left:Mouse.location.x()
     top:Mouse.location.y()
-
 
 class Thing
     constructor: ({source:@source, position:@position, id:@id}) ->
@@ -11,9 +11,6 @@ class Thing
         @position ?= default_position()
         @id ?= Guid()
         things[@id] = @
-        #image = new Image
-        #image.source = @source
-        #@node = $ image
         @node = $ "<img src=\"#{@source}\">"
         @node.css
             position:'absolute'
