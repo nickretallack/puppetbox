@@ -1,7 +1,8 @@
 (function() {
-  var app, express, io, socketio;
+  var app, express, io, port, socketio;
   express = require('express');
   socketio = require('socket.io');
+  port = 5000;
   app = express.createServer();
   app.use(express.static(__dirname));
   io = socketio.listen(app);
@@ -14,5 +15,6 @@
       return socket.broadcast.emit('create', data);
     });
   });
-  app.listen(5000);
+  app.listen(port);
+  console.log("Running on port " + port);
 }).call(this);

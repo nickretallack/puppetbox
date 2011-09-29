@@ -1,5 +1,6 @@
 express = require 'express'
 socketio = require 'socket.io'
+port = 5000
 
 app = express.createServer()
 app.use express.static __dirname
@@ -10,4 +11,5 @@ io.sockets.on 'connection', (socket) ->
         socket.broadcast.emit 'move', data
     socket.on 'create', (data) ->
         socket.broadcast.emit 'create', data
-app.listen 5000
+app.listen port
+console.log "Running on port #{port}"
