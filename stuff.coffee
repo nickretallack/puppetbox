@@ -10,24 +10,24 @@ class Thing
         created = not @id
         @position ?= default_position()
         @id ?= Guid()
-        things[@id] = @
-        @node = $ "<img src=\"#{@source}\">"
-        @node.css
-            position:'absolute'
-        @move @position
-        @node.draggable
-            drag: (event, ui) =>
-                @position = 
-                    left:ui.offset.left
-                    top:ui.offset.top
-                socket.emit 'move',
-                    position:@position
-                    id:@id
-            stop: (event, ui) =>
-                console.log event, ui
-        $(document.body).append @node
 
-        socket.emit 'create', @toJSON() if created
+        if not created
+            things[@id] = @
+            @node = $ "<img src=\"#{@source}\">"
+            @node.css
+                position:'absolute'
+            @move @position
+            @node.draggable
+                drag: (event, ui) =>
+                    @position = 
+                        left:ui.offset.left
+                        top:ui.offset.top
+                    socket.publish "/#{room_name}/move",
+                        position:@position
+                        id:@id
+            $(document.body).append @node
+
+        socket.publish "/#{room_name}/create", @toJSON() if created
 
     toJSON: ->
         position:@position
@@ -39,12 +39,12 @@ class Thing
             left:left
             top:top
         
-socket = io.connect 'http://localhost:5000/'
-socket.on 'move', ({id,position}) ->
+socket = new Faye.Client "http://localhost:5000/socket"
+socket.subscribe "/#{room_name}/move", ({id,position}) ->
     thing = things[id]
     thing.move position
     
-socket.on 'create', ({id, position, source}) ->
+socket.subscribe "/#{room_name}/create", ({id, position, source}) ->
     thing = new Thing
         id:id
         position:position

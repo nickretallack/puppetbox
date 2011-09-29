@@ -24,30 +24,29 @@
       } else {
         this.id = Guid();
       };
-      things[this.id] = this;
-      this.node = $("<img src=\"" + this.source + "\">");
-      this.node.css({
-        position: 'absolute'
-      });
-      this.move(this.position);
-      this.node.draggable({
-        drag: __bind(function(event, ui) {
-          this.position = {
-            left: ui.offset.left,
-            top: ui.offset.top
-          };
-          return socket.emit('move', {
-            position: this.position,
-            id: this.id
-          });
-        }, this),
-        stop: __bind(function(event, ui) {
-          return console.log(event, ui);
-        }, this)
-      });
-      $(document.body).append(this.node);
+      if (!created) {
+        things[this.id] = this;
+        this.node = $("<img src=\"" + this.source + "\">");
+        this.node.css({
+          position: 'absolute'
+        });
+        this.move(this.position);
+        this.node.draggable({
+          drag: __bind(function(event, ui) {
+            this.position = {
+              left: ui.offset.left,
+              top: ui.offset.top
+            };
+            return socket.publish("/" + room_name + "/move", {
+              position: this.position,
+              id: this.id
+            });
+          }, this)
+        });
+        $(document.body).append(this.node);
+      }
       if (created) {
-        socket.emit('create', this.toJSON());
+        socket.publish("/" + room_name + "/create", this.toJSON());
       }
     }
     Thing.prototype.toJSON = function() {
@@ -67,14 +66,14 @@
     };
     return Thing;
   })();
-  socket = io.connect('http://localhost:5000/');
-  socket.on('move', function(_arg) {
+  socket = new Faye.Client("http://localhost:5000/socket");
+  socket.subscribe("/" + room_name + "/move", function(_arg) {
     var id, position, thing;
     id = _arg.id, position = _arg.position;
     thing = things[id];
     return thing.move(position);
   });
-  socket.on('create', function(_arg) {
+  socket.subscribe("/" + room_name + "/create", function(_arg) {
     var id, position, source, thing;
     id = _arg.id, position = _arg.position, source = _arg.source;
     return thing = new Thing({

@@ -1,22 +1,16 @@
 (function() {
-  var app, express, io, port, socketio;
+  var Faye, app, express, faye, port;
   express = require('express');
-  socketio = require('socket.io');
+  Faye = require('faye');
   port = 5000;
   app = express.createServer();
   app.use(express.static(__dirname));
   app.set('views', __dirname);
-  io = socketio.listen(app);
-  io.set('log level', 1);
-  io.sockets.on('connection', function(socket) {
-    socket.on('move', function(data) {
-      return socket.broadcast.emit('move', data);
-    });
-    return socket.on('create', function(data) {
-      return socket.broadcast.emit('create', data);
-    });
+  faye = new Faye.NodeAdapter({
+    mount: '/socket'
   });
-  app.get('/:room', function(req, res) {
+  faye.attach(app);
+  app.get('/room/:room', function(req, res) {
     return res.render('room.ejs', {
       room: req.params.room,
       layout: false
