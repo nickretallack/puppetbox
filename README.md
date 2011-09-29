@@ -12,3 +12,14 @@ You need to check out my javascript-libraries repo next to this one.  This is ju
 To run the server you need node.js and the following npm modules: express, socket.io
 
 To compile the Coffee-Script into JavaScript, install the coffee-script npm module and run the coffee compiler as a watchdog wth `coffee -wc *.coffee` so it'll compile automatically while you code.
+
+Todos:
+---
+* Make scoped "rooms" for this so it's not just one global application
+* Server-side persistence
+* Selection info panel on the side
+* Delete objects
+* Move objects up/down in the stacking order
+* Select multiple objects and manipulate them together
+* Repeatedly stamp down the same image
+* Globally replace an image
