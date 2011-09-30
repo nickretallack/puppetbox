@@ -1,5 +1,7 @@
 port = 5000
-db_uri = 'tcp://localhost/puppetbox'
+# TODO: override this with the environ.  Don't commit it!
+
+db_uri = process.env.PUPPETBOX_DB_URI
 
 express = require 'express'
 Faye = require 'faye'
@@ -32,7 +34,7 @@ app.get '/play/:room', (req, res) ->
     Flow().seq (next) ->
         db.query "select * from room where name = $1", [room_name], next
     .seq (next, result) ->
-        if result.rowCount is 0
+        if result.rows.length is 0
             room_id = Guid()
             db.query """insert into room (id, name) values ($1, $2)""", [room_id, room_name], next
         else
@@ -47,10 +49,8 @@ app.get '/play/:room', (req, res) ->
             room:room_id,
             items:JSON.stringify result.rows
 
-create_item = ({room_id, source, position}) ->
+create_item = ({room_id, item_id, source, position}) ->
     image_id = Guid() # TODO: test for duplicate image
-    item_id = Guid()
-    console.log "ITEMS! #{image_id}, #{item_id}, #{position}"
     Flow().seq (next) ->
         db.query "begin", next
     .seq (next) ->
@@ -79,6 +79,7 @@ Persistence =
             if command is 'create'
                 create_item
                     room_id:room_id
+                    item_id:message.data.id
                     source:message.data.source
                     position:message.data.position
             if command is 'move'

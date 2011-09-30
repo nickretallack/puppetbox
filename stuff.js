@@ -1,7 +1,8 @@
 (function() {
-  var Thing, default_position, point_from_postgres, socket, things;
+  var Thing, client_id, default_position, point_from_postgres, socket, things;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   things = {};
+  client_id = Guid();
   default_position = function() {
     return {
       left: Mouse.location.x(),
@@ -39,7 +40,8 @@
             };
             return socket.publish("/" + ROOM + "/move", {
               position: this.position,
-              id: this.id
+              id: this.id,
+              client_id: client_id
             });
           }, this)
         });
@@ -64,10 +66,13 @@
     };
     return Thing;
   })();
-  socket = new Faye.Client("http://localhost:5000/socket");
+  socket = new Faye.Client("/socket");
   socket.subscribe("/" + ROOM + "/move", function(_arg) {
-    var id, position, thing;
-    id = _arg.id, position = _arg.position;
+    var id, position, the_client_id, thing;
+    id = _arg.id, position = _arg.position, the_client_id = _arg.client_id;
+    if (the_client_id === client_id) {
+      return;
+    }
     thing = things[id];
     return thing.move(position);
   });

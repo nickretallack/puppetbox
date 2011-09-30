@@ -1,5 +1,6 @@
 #ROOM = window.location.pathname.slice 1
 things = {}
+client_id = Guid()
 
 default_position = ->
     left:Mouse.location.x()
@@ -26,6 +27,7 @@ class Thing
                     socket.publish "/#{ROOM}/move",
                         position:@position
                         id:@id
+                        client_id:client_id
         else
             socket.publish "/#{ROOM}/create", @toJSON()
 
@@ -39,8 +41,9 @@ class Thing
             left:left
             top:top
         
-socket = new Faye.Client "http://localhost:5000/socket"
-socket.subscribe "/#{ROOM}/move", ({id,position}) ->
+socket = new Faye.Client "/socket"
+socket.subscribe "/#{ROOM}/move", ({id,position,client_id:the_client_id}) ->
+    return if the_client_id is client_id
     thing = things[id]
     thing.move position
     

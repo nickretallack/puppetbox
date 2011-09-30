@@ -1,7 +1,7 @@
 (function() {
   var Faye, Flow, Guid, Persistence, app, create_item, db, db_uri, express, faye, move_item, pg, pg_client, port, postgres_point;
   port = 5000;
-  db_uri = 'tcp://localhost/puppetbox';
+  db_uri = process.env.PUPPETBOX_DB_URI;
   express = require('express');
   Faye = require('faye');
   pg = require('pg');
@@ -25,7 +25,7 @@
     return Flow().seq(function(next) {
       return db.query("select * from room where name = $1", [room_name], next);
     }).seq(function(next, result) {
-      if (result.rowCount === 0) {
+      if (result.rows.length === 0) {
         room_id = Guid();
         return db.query("insert into room (id, name) values ($1, $2)", [room_id, room_name], next);
       } else {
@@ -44,10 +44,8 @@
   });
   create_item = function(_arg) {
     var image_id, item_id, position, room_id, source;
-    room_id = _arg.room_id, source = _arg.source, position = _arg.position;
+    room_id = _arg.room_id, item_id = _arg.item_id, source = _arg.source, position = _arg.position;
     image_id = Guid();
-    item_id = Guid();
-    console.log("ITEMS! " + image_id + ", " + item_id + ", " + position);
     return Flow().seq(function(next) {
       return db.query("begin", next);
     }).seq(function(next) {
@@ -79,6 +77,7 @@
         if (command === 'create') {
           create_item({
             room_id: room_id,
+            item_id: message.data.id,
             source: message.data.source,
             position: message.data.position
           });
