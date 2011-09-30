@@ -1,11 +1,11 @@
 (function() {
-  var Thing, client_id, default_position, point_from_postgres, socket, things;
+  var Thing, client_id, default_position, get_data_url, point_from_postgres, socket, things;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   things = {};
   client_id = Guid();
   default_position = function() {
     return {
-      left: Mouse.location.x(),
+      left: Mouse.location.x() - 300,
       top: Mouse.location.y()
     };
   };
@@ -39,24 +39,33 @@
           stopped: stopped
         });
       }, this);
-      if (!created) {
-        things[this.id] = this;
-        this.node = $("<img src=\"" + this.source + "\">");
-        $(document.body).append(this.node);
-        this.node.css({
-          position: 'absolute'
+      things[this.id] = this;
+      this.node = $("<img src=\"" + this.source + "\">");
+      $('#play_area').append(this.node);
+      this.node.css({
+        position: 'absolute'
+      });
+      this.move(this.position);
+      this.node.draggable({
+        drag: function(event, ui) {
+          return publish_movement(ui.offset, false);
+        },
+        stop: function(event, ui) {
+          return publish_movement(ui.offset, true);
+        }
+      });
+      this.node.click(__bind(function() {
+        return $('#current_image').attr({
+          src: this.source
         });
-        this.move(this.position);
-        this.node.draggable({
-          drag: function(event, ui) {
-            return publish_movement(ui.offset, false);
-          },
-          stop: function(event, ui) {
-            return publish_movement(ui.offset, true);
-          }
+      }, this));
+      if (created) {
+        socket.publish("/" + ROOM + "/create", {
+          position: this.position,
+          id: this.id,
+          source: this.source,
+          client_id: client_id
         });
-      } else {
-        socket.publish("/" + ROOM + "/create", this.toJSON());
       }
     }
     Thing.prototype.toJSON = function() {
@@ -89,6 +98,9 @@
   socket.subscribe("/" + ROOM + "/create", function(_arg) {
     var id, position, source, thing;
     id = _arg.id, position = _arg.position, source = _arg.source;
+    if (the_client_id === client_id) {
+      return;
+    }
     return thing = new Thing({
       id: id,
       position: position,
@@ -112,13 +124,29 @@
       top: components[1]
     };
   };
+  get_data_url = function(file, callback) {
+    var reader;
+    reader = new FileReader();
+    reader.onload = function(event) {
+      return callback(event.target.result);
+    };
+    return reader.readAsDataURL(file);
+  };
   $(function() {
-    var item, _i, _len, _results;
-    $("html").pasteImageReader(function(_arg) {
-      var dataURL, filename;
-      filename = _arg.filename, dataURL = _arg.dataURL;
-      return new Thing({
-        source: dataURL
+    var current_image, item, _i, _len, _results;
+    current_image = $('#current_image');
+    $("html").pasteImageReader(function(file) {
+      /* A new file!
+      Lets display it using whatever method's faster:
+      a data url, or a file upload. */      console.log(file);
+      return get_data_url(file, function(data_url) {
+        console.log(data_url);
+        current_image.attr({
+          src: data_url
+        });
+        return new Thing({
+          source: data_url
+        });
       });
     });
     _results = [];

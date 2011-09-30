@@ -3,7 +3,7 @@ things = {}
 client_id = Guid()
 
 default_position = ->
-    left:Mouse.location.x()
+    left:Mouse.location.x() - 300
     top:Mouse.location.y()
 
 class Thing
@@ -22,18 +22,24 @@ class Thing
                 client_id:client_id
                 stopped:stopped
 
-        if not created
-            things[@id] = @
-            @node = $ "<img src=\"#{@source}\">"
-            $(document.body).append @node
-            @node.css
-                position:'absolute'
-            @move @position
-            @node.draggable
-                drag: (event, ui) -> publish_movement ui.offset, false
-                stop: (event, ui) -> publish_movement ui.offset, true
-        else
-            socket.publish "/#{ROOM}/create", @toJSON()
+        things[@id] = @
+        @node = $ "<img src=\"#{@source}\">"
+        $('#play_area').append @node
+        @node.css
+            position:'absolute'
+        @move @position
+        @node.draggable
+            drag: (event, ui) -> publish_movement ui.offset, false
+            stop: (event, ui) -> publish_movement ui.offset, true
+        @node.click =>
+            $('#current_image').attr src:@source
+
+        if created
+            socket.publish "/#{ROOM}/create", 
+                position:@position
+                id:@id
+                source:@source
+                client_id:client_id
 
     toJSON: ->
         position:@position
@@ -52,6 +58,7 @@ socket.subscribe "/#{ROOM}/move", ({id,position,client_id:the_client_id}) ->
     thing.move position
     
 socket.subscribe "/#{ROOM}/create", ({id, position, source}) ->
+    return if the_client_id is client_id
     thing = new Thing
         id:id
         position:position
@@ -61,9 +68,26 @@ point_from_postgres = (string) ->
     components = (parseInt component for component in string[1...-1].split ',')
     {left:components[0], top:components[1]}
 
+
+get_data_url = (file, callback) ->
+    reader = new FileReader()
+    reader.onload = (event) -> callback event.target.result
+    reader.readAsDataURL(file)
+
 $ ->
-    $("html").pasteImageReader ({filename, dataURL}) ->
-        new Thing source:dataURL
+    current_image = $('#current_image')
+
+    $("html").pasteImageReader (file) ->
+        ### A new file!
+        Lets display it using whatever method's faster:
+        a data url, or a file upload. ###
+
+        #upload_file
+        console.log file
+        get_data_url file, (data_url) -> 
+            console.log data_url
+            current_image.attr src:data_url
+            new Thing source:data_url
 
     for item in ITEMS
         item.position = point_from_postgres item.position

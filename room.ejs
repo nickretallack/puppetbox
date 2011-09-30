@@ -6,6 +6,9 @@
 var ROOM = "<%- room %>"
 var ITEMS = JSON.parse('<%- items %>')
 </script>
+<link rel="stylesheet" href="/library/reset.css">
+<link rel="stylesheet" href="/library/basic.css">
+<link rel="stylesheet" href="/style.css">
 <script src="/socket/faye.js"></script>
 <script src="/library/standard/jquery-latest.js"></script>
 <script src="/library/standard/guid.js"></script>
@@ -17,5 +20,12 @@ var ITEMS = JSON.parse('<%- items %>')
 <script src="/stuff.js"></script>
 </head>
 <body>
+<div id="play_area"></div>
+<nav id="side_panel">
+    <h1>Image</h1>
+    <div id="current_image_box">
+        <img id="current_image">
+    </div>
+</nav>
 </body>
 </html>
