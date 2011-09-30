@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html xmlns:ng="http://angularjs.org">
 <head>
 <title>Puppet Box!</title>
 <script>
@@ -10,6 +10,7 @@ var ITEMS = JSON.parse('<%- items %>')
 <link rel="stylesheet" href="/library/basic.css">
 <link rel="stylesheet" href="/style.css">
 <script src="/socket/faye.js"></script>
+<script src="/library/standard/angular.js" ng:autobind></script>
 <script src="/library/standard/jquery-latest.js"></script>
 <script src="/library/standard/guid.js"></script>
 <script src="/library/standard/jquery-ui.js"></script>
@@ -21,10 +22,13 @@ var ITEMS = JSON.parse('<%- items %>')
 </head>
 <body>
 <div id="play_area"></div>
-<nav id="side_panel">
-    <h1>Image</h1>
-    <div id="current_image_box">
-        <img id="current_image">
+<nav id="side_panel" ng:controller="SidePanel">
+    <div id="inspector">
+        <h1>Image</h1>
+        {{inspector.current_item}}
+        <div id="current_image_box">
+            <img id="current_image" ng:src="">
+        </div>
     </div>
 </nav>
 </body>

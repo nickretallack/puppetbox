@@ -1,5 +1,5 @@
 (function() {
-  var Thing, client_id, default_position, get_data_url, point_from_postgres, socket, things;
+  var Inspector, Thing, client_id, default_position, get_data_url, point_from_postgres, socket, things;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   things = {};
   client_id = Guid();
@@ -8,6 +8,15 @@
       left: Mouse.location.x() - 300,
       top: Mouse.location.y()
     };
+  };
+  Inspector = {
+    current_item: null
+  };
+  window.SidePanel = function() {
+    this.inspector = Inspector;
+    return this.$onEval(__bind(function() {
+      return console.log(this.inspector.current_item);
+    }, this));
   };
   Thing = (function() {
     function Thing(_arg) {
@@ -55,9 +64,8 @@
         }
       });
       this.node.click(__bind(function() {
-        return $('#current_image').attr({
-          src: this.source
-        });
+        Inspector.current_item = "YEAH" + Math.random();
+        return console.log(Inspector.current_item);
       }, this));
       if (created) {
         socket.publish("/" + ROOM + "/create", {

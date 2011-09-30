@@ -6,6 +6,17 @@ default_position = ->
     left:Mouse.location.x() - 300
     top:Mouse.location.y()
 
+Inspector = 
+    current_item:null
+
+window.SidePanel = ->
+    @inspector = Inspector
+    #set_current_item: (item) =>
+    #    @current_item = item
+    @$onEval => 
+        console.log @inspector.current_item
+
+
 class Thing
     constructor: ({source:@source, position:@position, id:@id}) ->
         created = not @id
@@ -32,7 +43,9 @@ class Thing
             drag: (event, ui) -> publish_movement ui.offset, false
             stop: (event, ui) -> publish_movement ui.offset, true
         @node.click =>
-            $('#current_image').attr src:@source
+            Inspector.current_item = "YEAH" + Math.random()
+            console.log Inspector.current_item
+            #$('#current_image').attr src:@source
 
         if created
             socket.publish "/#{ROOM}/create", 
