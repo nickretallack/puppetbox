@@ -20,7 +20,7 @@ Todos:
 * Debounce database writes for movement [DONE]
 * Selection info panel on the side [DONE]
 * Delete objects [DONE]
-* Work with real images instead of just data urls
+* Work with real image files instead of just data urls
 * De-dup images using hashes
 * Move objects up/down in the stacking order
 * Select multiple objects and manipulate them together
@@ -28,3 +28,5 @@ Todos:
 * Globally replace an image
 * File drag and drop
 * List of recent rooms on front page
+* Save states for rooms (set up the board for a board game)
+* Text bubbles?
