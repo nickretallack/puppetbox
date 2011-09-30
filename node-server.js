@@ -1,5 +1,5 @@
 (function() {
-  var Faye, Flow, Guid, Persistence, app, create_item, db, db_uri, delay, express, faye, move_item, move_item_debouncers, persistence_lag, pg, pg_client, port, postgres_point;
+  var Faye, Flow, Guid, Persistence, app, create_item, db, db_uri, delay, express, faye, move_item, pg, pg_client, port, postgres_point;
   port = 5000;
   db_uri = process.env.PUPPETBOX_DB_URI;
   express = require('express');
@@ -56,36 +56,21 @@
       return db.query("end", function() {});
     });
   };
-  /*
-  This is to keep the database from being hammered when someone is interactively moving something.  Unfortunately, putting a lag in here means that users who load the page at an unlucky time may not get all the information they need.  If the user is still dragging the thing while another user loads the page it's fine, since they will definitely receive another drag event or the stop event.  However, if the user has just stopped dragging, no more events will come, and if that stop is not synced to the database yet when somebody loads the page, they will never get the events to place it in the right place.  Therefore, the stop dragging event must bypass the delay, and clear it so that a previous value doesn't end up overwriting the later one.
-  
-  Then again, I didn't really need all this complexity in the first place because really only stops need to be persisted.  The only time the user will notice the persistence behavior is when they first load the page if things are in the wrong place, and if something is in mid drag and not persisted yet, they will get events that will fix it very soon.
-  */
-  delay = function(time, action) {
-    return setTimeout(action, time);
-  };
-  persistence_lag = 1000;
-  move_item_debouncers = {};
   move_item = function(_arg) {
-    var item_id, move_item_query, position, room_id, stopped;
+    var item_id, position, room_id, stopped;
     room_id = _arg.room_id, item_id = _arg.item_id, position = _arg.position, stopped = _arg.stopped;
-    move_item_query = function() {
-      console.log("moved", JSON.stringify(position));
-      return db.query("update item set position = $3\nwhere item.id = $2 and item.room_id = $1", [room_id, item_id, postgres_point(position)], function() {});
-    };
-    if (move_item_debouncers[item_id]) {
-      clearTimeout(move_item_debouncers[item_id]);
-    }
+    /* Only persists when movement stops.  Persistence only matters to the user at page load time, so users may see different things for just a moment until another drag or stop event is emitted. */
     if (stopped) {
-      return move_item_query();
-    } else {
-      return move_item_debouncers[item_id] = delay(persistence_lag, move_item_query);
+      return db.query("update item set position = $3\nwhere item.id = $2 and item.room_id = $1", [room_id, item_id, postgres_point(position)], function() {});
     }
   };
   postgres_point = function(_arg) {
     var left, top;
     left = _arg.left, top = _arg.top;
     return "" + left + "," + top;
+  };
+  delay = function(time, action) {
+    return setTimeout(action, time);
   };
   Persistence = {
     incoming: function(message, the_callback) {

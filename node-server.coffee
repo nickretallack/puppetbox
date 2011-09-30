@@ -10,6 +10,7 @@ db = require './library/standard/postgres-helper'
 Guid = require('./library/standard/guid').Guid
 Flow = require './library/standard/flow'
 
+
 # set up express
 app = express.createServer()
 app.use express.static __dirname
@@ -63,30 +64,15 @@ create_item = ({room_id, item_id, source, position}) ->
     .seq (next) ->
         db.query "end", ->
 
-###
-This is to keep the database from being hammered when someone is interactively moving something.  Unfortunately, putting a lag in here means that users who load the page at an unlucky time may not get all the information they need.  If the user is still dragging the thing while another user loads the page it's fine, since they will definitely receive another drag event or the stop event.  However, if the user has just stopped dragging, no more events will come, and if that stop is not synced to the database yet when somebody loads the page, they will never get the events to place it in the right place.  Therefore, the stop dragging event must bypass the delay, and clear it so that a previous value doesn't end up overwriting the later one.
-
-Then again, I didn't really need all this complexity in the first place because really only stops need to be persisted.  The only time the user will notice the persistence behavior is when they first load the page if things are in the wrong place, and if something is in mid drag and not persisted yet, they will get events that will fix it very soon.
-###
-
-delay = (time, action) -> setTimeout action, time
-persistence_lag = 1000 # 1 second
-move_item_debouncers = {}
 move_item = ({room_id, item_id, position, stopped}) ->
-    move_item_query = -> 
-        console.log "moved", JSON.stringify position
+    ### Only persists when movement stops.  Persistence only matters to the user at page load time, so users may see different things for just a moment until another drag or stop event is emitted. ###
+    if stopped
         db.query """update item set position = $3
             where item.id = $2 and item.room_id = $1""", 
             [room_id, item_id, postgres_point position], ->
 
-    clearTimeout move_item_debouncers[item_id] if move_item_debouncers[item_id]
-    if stopped
-        move_item_query()
-    else
-        move_item_debouncers[item_id] = delay persistence_lag, move_item_query
-        
-
 postgres_point = ({left,top}) -> "#{left},#{top}"
+delay = (time, action) -> setTimeout action, time
 
 # faye filters
 Persistence = 
