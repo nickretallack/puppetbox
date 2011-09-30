@@ -18,7 +18,7 @@
   pg_client = new pg.Client(db_uri);
   pg_client.connect();
   db.set_db(pg_client);
-  app.get('/room/:room', function(req, res) {
+  app.get('/play/:room', function(req, res) {
     var room_id, room_name;
     room_name = req.params.room;
     room_id = null;

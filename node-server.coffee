@@ -23,7 +23,7 @@ pg_client.connect()
 db.set_db pg_client
 
 # non-static routes
-app.get '/room/:room', (req, res) ->
+app.get '/play/:room', (req, res) ->
     # When you load a room, it needs to bootstrap what's in it.
     # TODO: db query that gets all objects in this room
     room_name = req.params.room
