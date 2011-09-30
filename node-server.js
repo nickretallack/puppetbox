@@ -1,5 +1,5 @@
 (function() {
-  var Faye, Flow, Guid, Persistence, app, create_item, db, db_uri, delay, express, faye, move_item, pg, pg_client, port, postgres_point;
+  var Faye, Flow, Guid, Persistence, app, create_item, db, db_uri, delay, delete_item, express, faye, move_item, pg, pg_client, port, postgres_point;
   port = 5000;
   db_uri = process.env.PUPPETBOX_DB_URI;
   express = require('express');
@@ -15,7 +15,7 @@
     mount: '/socket'
   });
   faye.attach(app);
-  pg_client = new pg.Client(db_uri);
+  pg_client = new pg["native"].Client(db_uri);
   pg_client.connect();
   db.set_db(pg_client);
   app.get('/play/:room', function(req, res) {
@@ -64,6 +64,11 @@
       return db.query("update item set position = $3\nwhere item.id = $2 and item.room_id = $1", [room_id, item_id, postgres_point(position)], function() {});
     }
   };
+  delete_item = function(_arg) {
+    var item_id, room_id;
+    room_id = _arg.room_id, item_id = _arg.item_id;
+    return db.query("delete from item where item.id = $1", [item_id], function() {});
+  };
   postgres_point = function(_arg) {
     var left, top;
     left = _arg.left, top = _arg.top;
@@ -94,6 +99,12 @@
             position: message.data.position,
             item_id: message.data.id,
             stopped: message.data.stopped
+          });
+        }
+        if (command === 'destroy') {
+          delete_item({
+            room_id: room_id,
+            item_id: message.data.id
           });
         }
       }

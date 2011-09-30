@@ -21,7 +21,7 @@ faye = new Faye.NodeAdapter mount:'/socket'
 faye.attach app
 
 # set up postgres
-pg_client = new pg.Client db_uri
+pg_client = new pg.native.Client(db_uri)
 pg_client.connect()
 db.set_db pg_client
 
@@ -71,6 +71,9 @@ move_item = ({room_id, item_id, position, stopped}) ->
             where item.id = $2 and item.room_id = $1""", 
             [room_id, item_id, postgres_point position], ->
 
+delete_item = ({room_id, item_id}) ->
+    db.query """delete from item where item.id = $1""", [item_id], ->
+
 postgres_point = ({left,top}) -> "#{left},#{top}"
 delay = (time, action) -> setTimeout action, time
 
@@ -92,6 +95,10 @@ Persistence =
                     position:message.data.position
                     item_id:message.data.id
                     stopped:message.data.stopped
+            if command is 'destroy'
+                delete_item
+                    room_id:room_id
+                    item_id:message.data.id
         callback()
 
 faye.addExtension Persistence
