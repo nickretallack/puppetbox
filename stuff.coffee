@@ -3,12 +3,12 @@ things = {}
 client_id = Guid()
 
 adjust_position = ({left, top}) ->
-    left:left - 300
+    left:if left is 0 then left else left - 300
     top:top
 
 default_position = ->
     adjust_position
-        left:Mouse.location.x() - 300
+        left:Mouse.location.x()
         top:Mouse.location.y()
 
 Inspector = 
@@ -134,11 +134,10 @@ $ ->
         a data url, or a file upload. ###
 
         #upload_file
-        console.log file
         get_data_url file, (data_url) -> 
-            console.log data_url
-            current_image.attr src:data_url
-            new Thing source:data_url
+            thing = new Thing source:data_url
+            Inspector.current_item = thing
+            react.changed Inspector, 'current_item'
 
     for item in ITEMS
         item.position = point_from_postgres item.position

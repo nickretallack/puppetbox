@@ -7,13 +7,13 @@
     var left, top;
     left = _arg.left, top = _arg.top;
     return {
-      left: left - 300,
+      left: left === 0 ? left : left - 300,
       top: top
     };
   };
   default_position = function() {
     return adjust_position({
-      left: Mouse.location.x() - 300,
+      left: Mouse.location.x(),
       top: Mouse.location.y()
     });
   };
@@ -191,15 +191,13 @@
     $("html").pasteImageReader(function(file) {
       /* A new file!
       Lets display it using whatever method's faster:
-      a data url, or a file upload. */      console.log(file);
-      return get_data_url(file, function(data_url) {
-        console.log(data_url);
-        current_image.attr({
-          src: data_url
-        });
-        return new Thing({
+      a data url, or a file upload. */      return get_data_url(file, function(data_url) {
+        var thing;
+        thing = new Thing({
           source: data_url
         });
+        Inspector.current_item = thing;
+        return react.changed(Inspector, 'current_item');
       });
     });
     _results = [];
