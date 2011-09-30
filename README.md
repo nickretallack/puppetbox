@@ -23,3 +23,7 @@ Todos:
 * Select multiple objects and manipulate them together
 * Repeatedly stamp down the same image
 * Globally replace an image
+* Work with real images instead of just data urls
+* File drag and drop
+* List of recent rooms on front page
+* Debounce database writes for movement

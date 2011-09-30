@@ -1,0 +1,10 @@
+I could totally change the persistence methods for this thing, and make it have a consistent API so they could be easily swapped.
+
+Postgres / SQL
+---
+Works pretty nicely, but it might be getting pegged when you move things around.  I should make a custom debouncing solution for when you move items by using setTimeouts keyed to the item's ID.
+Also it's a little over-complicated for what I'm doing.
+
+Flat Files per Room
+---
+I could totally do it all with flat files.  Just keep everything in memory and debounce writes in case the server goes down and I'm good.  Hm.
