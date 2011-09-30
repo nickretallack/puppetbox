@@ -1,7 +1,6 @@
 (function() {
-  var Thing, default_position, room_name, socket, things;
+  var Thing, default_position, point_from_postgres, socket, things;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
-  room_name = window.location.pathname.slice(1);
   things = {};
   default_position = function() {
     return {
@@ -27,6 +26,7 @@
       if (!created) {
         things[this.id] = this;
         this.node = $("<img src=\"" + this.source + "\">");
+        $(document.body).append(this.node);
         this.node.css({
           position: 'absolute'
         });
@@ -37,16 +37,14 @@
               left: ui.offset.left,
               top: ui.offset.top
             };
-            return socket.publish("/" + room_name + "/move", {
+            return socket.publish("/" + ROOM + "/move", {
               position: this.position,
               id: this.id
             });
           }, this)
         });
-        $(document.body).append(this.node);
-      }
-      if (created) {
-        socket.publish("/" + room_name + "/create", this.toJSON());
+      } else {
+        socket.publish("/" + ROOM + "/create", this.toJSON());
       }
     }
     Thing.prototype.toJSON = function() {
@@ -67,13 +65,13 @@
     return Thing;
   })();
   socket = new Faye.Client("http://localhost:5000/socket");
-  socket.subscribe("/" + room_name + "/move", function(_arg) {
+  socket.subscribe("/" + ROOM + "/move", function(_arg) {
     var id, position, thing;
     id = _arg.id, position = _arg.position;
     thing = things[id];
     return thing.move(position);
   });
-  socket.subscribe("/" + room_name + "/create", function(_arg) {
+  socket.subscribe("/" + ROOM + "/create", function(_arg) {
     var id, position, source, thing;
     id = _arg.id, position = _arg.position, source = _arg.source;
     return thing = new Thing({
@@ -82,13 +80,38 @@
       source: source
     });
   });
+  point_from_postgres = function(string) {
+    var component, components;
+    components = (function() {
+      var _i, _len, _ref, _results;
+      _ref = string.slice(1, -1).split(',');
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        component = _ref[_i];
+        _results.push(parseInt(component));
+      }
+      return _results;
+    })();
+    return {
+      left: components[0],
+      top: components[1]
+    };
+  };
   $(function() {
-    return $("html").pasteImageReader(function(_arg) {
-      var dataURL, filename, thing;
+    var item, _i, _len, _results;
+    $("html").pasteImageReader(function(_arg) {
+      var dataURL, filename;
       filename = _arg.filename, dataURL = _arg.dataURL;
-      return thing = new Thing({
+      return new Thing({
         source: dataURL
       });
     });
+    _results = [];
+    for (_i = 0, _len = ITEMS.length; _i < _len; _i++) {
+      item = ITEMS[_i];
+      item.position = point_from_postgres(item.position);
+      _results.push(new Thing(item));
+    }
+    return _results;
   });
 }).call(this);

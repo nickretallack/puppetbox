@@ -3,7 +3,8 @@
 <head>
 <title>Puppet Box!</title>
 <script>
-ROOM = "<%= room %>"
+var ROOM = "<%- room %>"
+var ITEMS = JSON.parse('<%- items %>')
 </script>
 <script src="/socket/faye.js"></script>
 <script src="/library/standard/jquery-latest.js"></script>

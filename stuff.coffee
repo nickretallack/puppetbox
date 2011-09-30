@@ -1,4 +1,4 @@
-room_name = window.location.pathname.slice 1
+#ROOM = window.location.pathname.slice 1
 things = {}
 
 default_position = ->
@@ -14,6 +14,7 @@ class Thing
         if not created
             things[@id] = @
             @node = $ "<img src=\"#{@source}\">"
+            $(document.body).append @node
             @node.css
                 position:'absolute'
             @move @position
@@ -22,12 +23,11 @@ class Thing
                     @position = 
                         left:ui.offset.left
                         top:ui.offset.top
-                    socket.publish "/#{room_name}/move",
+                    socket.publish "/#{ROOM}/move",
                         position:@position
                         id:@id
-            $(document.body).append @node
-
-        socket.publish "/#{room_name}/create", @toJSON() if created
+        else
+            socket.publish "/#{ROOM}/create", @toJSON()
 
     toJSON: ->
         position:@position
@@ -40,16 +40,24 @@ class Thing
             top:top
         
 socket = new Faye.Client "http://localhost:5000/socket"
-socket.subscribe "/#{room_name}/move", ({id,position}) ->
+socket.subscribe "/#{ROOM}/move", ({id,position}) ->
     thing = things[id]
     thing.move position
     
-socket.subscribe "/#{room_name}/create", ({id, position, source}) ->
+socket.subscribe "/#{ROOM}/create", ({id, position, source}) ->
     thing = new Thing
         id:id
         position:position
         source:source
 
+point_from_postgres = (string) ->
+    components = (parseInt component for component in string[1...-1].split ',')
+    {left:components[0], top:components[1]}
+
 $ ->
     $("html").pasteImageReader ({filename, dataURL}) ->
-        thing = new Thing source:dataURL
+        new Thing source:dataURL
+
+    for item in ITEMS
+        item.position = point_from_postgres item.position
+        new Thing item

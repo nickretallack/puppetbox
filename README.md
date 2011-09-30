@@ -16,7 +16,7 @@ To compile the Coffee-Script into JavaScript, install the coffee-script npm modu
 Todos:
 ---
 * Make scoped "rooms" for this so it's not just one global application [DONE]
-* Server-side persistence
+* Server-side persistence [DONE]
 * Selection info panel on the side
 * Delete objects
 * Move objects up/down in the stacking order
