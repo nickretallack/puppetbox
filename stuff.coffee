@@ -2,19 +2,18 @@
 things = {}
 client_id = Guid()
 
+adjust_position = ({left, top}) ->
+    left:left - 300
+    top:top
+
 default_position = ->
-    left:Mouse.location.x() - 300
-    top:Mouse.location.y()
+    adjust_position
+        left:Mouse.location.x() - 300
+        top:Mouse.location.y()
 
 Inspector = 
     current_item:null
 
-window.SidePanel = ->
-    @inspector = Inspector
-    #set_current_item: (item) =>
-    #    @current_item = item
-    @$onEval => 
-        console.log @inspector.current_item
 
 
 class Thing
@@ -25,13 +24,18 @@ class Thing
 
         publish_movement = (offset, stopped=true) =>
             @position = 
-                left:offset.left
-                top:offset.top
+                adjust_position
+                    left:offset.left
+                    top:offset.top
             socket.publish "/#{ROOM}/move",
                 position:@position
                 id:@id
                 client_id:client_id
                 stopped:stopped
+
+        select_this = =>
+            Inspector.current_item = @
+            react.changed Inspector, 'current_item'
 
         things[@id] = @
         @node = $ "<img src=\"#{@source}\">"
@@ -42,10 +46,8 @@ class Thing
         @node.draggable
             drag: (event, ui) -> publish_movement ui.offset, false
             stop: (event, ui) -> publish_movement ui.offset, true
-        @node.click =>
-            Inspector.current_item = "YEAH" + Math.random()
-            console.log Inspector.current_item
-            #$('#current_image').attr src:@source
+            start: select_this
+        @node.click select_this
 
         if created
             socket.publish "/#{ROOM}/create", 
@@ -63,6 +65,21 @@ class Thing
         @node.css
             left:left
             top:top
+
+    destroy: ->
+        @node.remove()
+        socket.publish "/#{ROOM}/destroy", 
+            id:@id
+            client_id:client_id
+
+    clone: ->
+        new_position = 
+            left:@position.left + 10
+            top:@position.top + 10
+        new Thing
+            position:new_position
+            source:@source
+            
         
 socket = new Faye.Client "/socket"
 socket.subscribe "/#{ROOM}/move", ({id,position,client_id:the_client_id}) ->
@@ -70,12 +87,18 @@ socket.subscribe "/#{ROOM}/move", ({id,position,client_id:the_client_id}) ->
     thing = things[id]
     thing.move position
     
-socket.subscribe "/#{ROOM}/create", ({id, position, source}) ->
+socket.subscribe "/#{ROOM}/create", ({id, position, source, client_id:the_client_id}) ->
     return if the_client_id is client_id
     thing = new Thing
         id:id
         position:position
         source:source
+
+socket.subscribe "/#{ROOM}/destroy", ({id, client_id:the_client_id}) ->
+    return if the_client_id is client_id
+    thing = things[id]
+    thing.destroy()
+    
 
 point_from_postgres = (string) ->
     components = (parseInt component for component in string[1...-1].split ',')
@@ -89,6 +112,21 @@ get_data_url = (file, callback) ->
 
 $ ->
     current_image = $('#current_image')
+
+    react.update
+        node: $('#side_panel')[0]
+        scope: Inspector
+        anchor: true
+
+    $("#delete").click (event) ->
+        Inspector.current_item.destroy()
+        Inspector.current_item = null
+        react.changed Inspector, 'current_item'
+
+    $("#clone").click (event) ->
+        Inspector.current_item = Inspector.current_item.clone()
+        react.changed Inspector, 'current_item'
+
 
     $("html").pasteImageReader (file) ->
         ### A new file!

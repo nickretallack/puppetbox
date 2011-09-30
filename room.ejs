@@ -1,5 +1,5 @@
 <!doctype html>
-<html xmlns:ng="http://angularjs.org">
+<html>
 <head>
 <title>Puppet Box!</title>
 <script>
@@ -10,7 +10,8 @@ var ITEMS = JSON.parse('<%- items %>')
 <link rel="stylesheet" href="/library/basic.css">
 <link rel="stylesheet" href="/style.css">
 <script src="/socket/faye.js"></script>
-<script src="/library/standard/angular.js" ng:autobind></script>
+<script src="/library/standard/js.js"></script>
+<script src="/library/standard/react.js"></script>
 <script src="/library/standard/jquery-latest.js"></script>
 <script src="/library/standard/guid.js"></script>
 <script src="/library/standard/jquery-ui.js"></script>
@@ -22,13 +23,13 @@ var ITEMS = JSON.parse('<%- items %>')
 </head>
 <body>
 <div id="play_area"></div>
-<nav id="side_panel" ng:controller="SidePanel">
-    <div id="inspector">
+<nav id="side_panel">
+    <div id="inspector" react="showIf current_item">
         <h1>Image</h1>
-        {{inspector.current_item}}
-        <div id="current_image_box">
-            <img id="current_image" ng:src="">
-        </div>
+        <span react="contain current_item.id"></span>
+        <img id="current_image" react="attr 'src' current_item.source">
+        <button id="delete">Delete</button>
+        <button id="clone">Clone</button>
     </div>
 </nav>
 </body>
