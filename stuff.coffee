@@ -12,6 +12,16 @@ class Thing
         @position ?= default_position()
         @id ?= Guid()
 
+        publish_movement = (offset, stopped=true) =>
+            @position = 
+                left:offset.left
+                top:offset.top
+            socket.publish "/#{ROOM}/move",
+                position:@position
+                id:@id
+                client_id:client_id
+                stopped:stopped
+
         if not created
             things[@id] = @
             @node = $ "<img src=\"#{@source}\">"
@@ -20,14 +30,8 @@ class Thing
                 position:'absolute'
             @move @position
             @node.draggable
-                drag: (event, ui) =>
-                    @position = 
-                        left:ui.offset.left
-                        top:ui.offset.top
-                    socket.publish "/#{ROOM}/move",
-                        position:@position
-                        id:@id
-                        client_id:client_id
+                drag: (event, ui) -> publish_movement ui.offset, false
+                stop: (event, ui) -> publish_movement ui.offset, true
         else
             socket.publish "/#{ROOM}/create", @toJSON()
 

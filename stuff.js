@@ -11,7 +11,7 @@
   };
   Thing = (function() {
     function Thing(_arg) {
-      var created, _ref, _ref2;
+      var created, publish_movement, _ref, _ref2;
       this.source = _arg.source, this.position = _arg.position, this.id = _arg.id;
       created = !this.id;
             if ((_ref = this.position) != null) {
@@ -24,6 +24,21 @@
       } else {
         this.id = Guid();
       };
+      publish_movement = __bind(function(offset, stopped) {
+        if (stopped == null) {
+          stopped = true;
+        }
+        this.position = {
+          left: offset.left,
+          top: offset.top
+        };
+        return socket.publish("/" + ROOM + "/move", {
+          position: this.position,
+          id: this.id,
+          client_id: client_id,
+          stopped: stopped
+        });
+      }, this);
       if (!created) {
         things[this.id] = this;
         this.node = $("<img src=\"" + this.source + "\">");
@@ -33,17 +48,12 @@
         });
         this.move(this.position);
         this.node.draggable({
-          drag: __bind(function(event, ui) {
-            this.position = {
-              left: ui.offset.left,
-              top: ui.offset.top
-            };
-            return socket.publish("/" + ROOM + "/move", {
-              position: this.position,
-              id: this.id,
-              client_id: client_id
-            });
-          }, this)
+          drag: function(event, ui) {
+            return publish_movement(ui.offset, false);
+          },
+          stop: function(event, ui) {
+            return publish_movement(ui.offset, true);
+          }
         });
       } else {
         socket.publish("/" + ROOM + "/create", this.toJSON());
