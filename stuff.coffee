@@ -79,6 +79,9 @@ class Thing
         new Thing
             position:new_position
             source:@source
+
+    set_source: (@source) ->
+        @node.attr 'src', @source
             
         
 socket = new Faye.Client "/socket"
@@ -111,8 +114,6 @@ get_data_url = (file, callback) ->
     reader.readAsDataURL(file)
 
 $ ->
-    current_image = $('#current_image')
-
     react.update
         node: $('#side_panel')[0]
         scope: Inspector
@@ -133,7 +134,14 @@ $ ->
         Lets display it using whatever method's faster:
         a data url, or a file upload. ###
 
-        #upload_file
+        thing = null
+        upload_file file, '/upload', (result) ->
+            thing.set_source "/uploads/#{result}"
+        , ->
+            console.log "error", arguments
+        ,  ->
+            console.log "progress", arguments
+
         get_data_url file, (data_url) -> 
             thing = new Thing source:data_url
             Inspector.current_item = thing

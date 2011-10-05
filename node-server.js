@@ -1,5 +1,5 @@
 (function() {
-  var Faye, Flow, Guid, Persistence, app, create_item, db, db_uri, delay, delete_item, express, faye, move_item, pg, pg_client, port, postgres_point;
+  var Faye, Flow, Guid, Persistence, UPLOAD_DIR, app, create_item, crypto, db, db_uri, delay, delete_item, express, faye, form, fs, move_item, pg, pg_client, port, postgres_point, rsplit, util;
   port = 5000;
   db_uri = process.env.PUPPETBOX_DB_URI;
   express = require('express');
@@ -8,8 +8,16 @@
   db = require('./library/standard/postgres-helper');
   Guid = require('./library/standard/guid').Guid;
   Flow = require('./library/standard/flow');
+  form = require('connect-form');
+  fs = require('fs');
+  crypto = require('crypto');
+  util = require('util');
+  UPLOAD_DIR = "" + __dirname + "/uploads";
   app = express.createServer();
   app.use(express.static(__dirname));
+  app.use(form({
+    keepExtensions: true
+  }));
   app.set('views', __dirname);
   faye = new Faye.NodeAdapter({
     mount: '/socket'
@@ -18,9 +26,9 @@
   pg_client = new pg["native"].Client(db_uri);
   pg_client.connect();
   db.set_db(pg_client);
-  app.get('/play/:room', function(req, res) {
+  app.get('/play/:room', function(request, response) {
     var room_id, room_name;
-    room_name = req.params.room;
+    room_name = request.params.room;
     room_id = null;
     return Flow().seq(function(next) {
       return db.query("select * from room where name = $1", [room_name], next);
@@ -35,10 +43,46 @@
     }).seq(function(next) {
       return db.query("select item.id, item.position, image.source from item\njoin image on item.room_id = $1 and image.id = item.image_id", [room_id], next);
     }).seq(function(next, result) {
-      return res.render('room.ejs', {
+      return response.render('room.ejs', {
         layout: false,
         room: room_id,
         items: JSON.stringify(result.rows)
+      });
+    });
+  });
+  rsplit = function(string, delimiter) {
+    var split_index;
+    split_index = string.lastIndexOf(delimiter);
+    return [string.slice(0, split_index), string.slice(split_index)];
+  };
+  app.post('/upload', function(request, response, next) {
+    return request.form.complete(function(error, fields, files) {
+      var extension, file, hash, kind, stream, _ref;
+      if (error) {
+        return next(error);
+      }
+      if (!(files.file != null)) {
+        return;
+      }
+      file = files.file;
+      _ref = file.type.split('/'), kind = _ref[0], extension = _ref[1];
+      if (kind === !'image') {
+        return response.end("Invalid file type: " + file.type);
+      }
+      hash = crypto.createHash('sha256');
+      stream = fs.createReadStream(file.path, {
+        encoding: 'binary'
+      });
+      stream.addListener('data', function(chunk) {
+        return hash.update(chunk);
+      });
+      return stream.addListener('close', function() {
+        var digest, new_filename, new_path;
+        digest = hash.digest('hex');
+        new_filename = "" + digest + "." + extension;
+        new_path = "" + UPLOAD_DIR + "/" + new_filename;
+        fs.rename(file.path, new_path);
+        return response.end(new_filename);
       });
     });
   });

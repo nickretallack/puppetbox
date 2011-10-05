@@ -9,11 +9,17 @@ pg = require 'pg'
 db = require './library/standard/postgres-helper'
 Guid = require('./library/standard/guid').Guid
 Flow = require './library/standard/flow'
+form = require 'connect-form'
+fs = require 'fs'
+crypto = require 'crypto'
+util = require 'util'
+UPLOAD_DIR = "#{__dirname}/uploads"
 
 
 # set up express
 app = express.createServer()
 app.use express.static __dirname
+app.use form keepExtensions:true
 app.set 'views', __dirname
 
 # set up faye
@@ -26,10 +32,10 @@ pg_client.connect()
 db.set_db pg_client
 
 # non-static routes
-app.get '/play/:room', (req, res) ->
+app.get '/play/:room', (request, response) ->
     # When you load a room, it needs to bootstrap what's in it.
     # TODO: db query that gets all objects in this room
-    room_name = req.params.room
+    room_name = request.params.room
     room_id = null
 
     Flow().seq (next) ->
@@ -45,10 +51,36 @@ app.get '/play/:room', (req, res) ->
         db.query """select item.id, item.position, image.source from item
             join image on item.room_id = $1 and image.id = item.image_id""", [room_id], next
     .seq (next, result) ->
-        res.render 'room.ejs',
+        response.render 'room.ejs',
             layout:false
             room:room_id,
             items:JSON.stringify result.rows
+
+rsplit = (string, delimiter) ->
+    split_index = string.lastIndexOf delimiter
+    [string[0...split_index], string[split_index..-1]]
+
+app.post '/upload', (request, response, next) ->
+    request.form.complete (error, fields, files) ->
+        return next error if error
+        return if not files.file?
+        file = files.file
+        [kind, extension] = file.type.split '/'
+        return response.end "Invalid file type: #{file.type}" if kind is not 'image'
+        hash = crypto.createHash 'sha256'
+        stream = fs.createReadStream file.path,
+            encoding:'binary'
+        stream.addListener 'data', (chunk) ->
+            hash.update chunk
+        stream.addListener 'close', ->
+            digest = hash.digest 'hex'
+            new_filename = "#{digest}.#{extension}"
+            new_path = "#{UPLOAD_DIR}/#{new_filename}"
+            fs.rename file.path, new_path
+            response.end new_filename
+            
+    
+
 
 create_item = ({room_id, item_id, source, position}) ->
     image_id = Guid() # TODO: test for duplicate image

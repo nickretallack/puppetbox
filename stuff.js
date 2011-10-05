@@ -113,6 +113,10 @@
         source: this.source
       });
     };
+    Thing.prototype.set_source = function(source) {
+      this.source = source;
+      return this.node.attr('src', this.source);
+    };
     return Thing;
   })();
   socket = new Faye.Client("/socket");
@@ -172,8 +176,7 @@
     return reader.readAsDataURL(file);
   };
   $(function() {
-    var current_image, item, _i, _len, _results;
-    current_image = $('#current_image');
+    var item, _i, _len, _results;
     react.update({
       node: $('#side_panel')[0],
       scope: Inspector,
@@ -191,8 +194,16 @@
     $("html").pasteImageReader(function(file) {
       /* A new file!
       Lets display it using whatever method's faster:
-      a data url, or a file upload. */      return get_data_url(file, function(data_url) {
-        var thing;
+      a data url, or a file upload. */      var thing;
+      thing = null;
+      upload_file(file, '/upload', function(result) {
+        return thing.set_source("/uploads/" + result);
+      }, function() {
+        return console.log("error", arguments);
+      }, function() {
+        return console.log("progress", arguments);
+      });
+      return get_data_url(file, function(data_url) {
         thing = new Thing({
           source: data_url
         });
