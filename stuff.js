@@ -22,8 +22,8 @@
   };
   Thing = (function() {
     function Thing(_arg) {
-      var created, publish_movement, select_this, _ref, _ref2;
-      this.source = _arg.source, this.position = _arg.position, this.id = _arg.id;
+      var client_side_ready, created, publish_movement, ready, select_this, _ref, _ref2;
+      this.file = _arg.file, this.source = _arg.source, this.position = _arg.position, this.id = _arg.id, ready = _arg.ready;
       created = !this.id;
             if ((_ref = this.position) != null) {
         _ref;
@@ -35,6 +35,19 @@
       } else {
         this.id = Guid();
       };
+      get_data_url(this.file, function(data_url) {
+        this.source = data_url;
+        client_side_ready(data_url);
+        return ready(this);
+      });
+      upload_file(file, '/upload', function(result) {
+        this.set_source("/uploads/" + result);
+        return this.server_side_ready(result);
+      }, function() {
+        return console.log("error", arguments);
+      }, function() {
+        return console.log("progress", arguments);
+      });
       publish_movement = __bind(function(offset, stopped) {
         if (stopped == null) {
           stopped = true;
@@ -54,23 +67,25 @@
         Inspector.current_item = this;
         return react.changed(Inspector, 'current_item');
       }, this);
-      things[this.id] = this;
-      this.node = $("<img src=\"" + this.source + "\">");
-      $('#play_area').append(this.node);
-      this.node.css({
-        position: 'absolute'
-      });
-      this.move(this.position);
-      this.node.draggable({
-        drag: function(event, ui) {
-          return publish_movement(ui.offset, false);
-        },
-        stop: function(event, ui) {
-          return publish_movement(ui.offset, true);
-        },
-        start: select_this
-      });
-      this.node.click(select_this);
+      client_side_ready = function(source) {
+        things[this.id] = this;
+        this.node = $("<img src=\"" + this.source + "\">");
+        $('#play_area').append(this.node);
+        this.node.css({
+          position: 'absolute'
+        });
+        this.move(this.position);
+        this.node.draggable({
+          drag: function(event, ui) {
+            return publish_movement(ui.offset, false);
+          },
+          stop: function(event, ui) {
+            return publish_movement(ui.offset, true);
+          },
+          start: select_this
+        });
+        return this.node.click(select_this);
+      };
       if (created) {
         socket.publish("/" + ROOM + "/create", {
           position: this.position,
@@ -194,28 +209,18 @@
     $("html").pasteImageReader(function(file) {
       /* A new file!
       Lets display it using whatever method's faster:
-      a data url, or a file upload. */      var thing;
-      thing = null;
-      upload_file(file, '/upload', function(result) {
-        return thing.set_source("/uploads/" + result);
-      }, function() {
-        return console.log("error", arguments);
-      }, function() {
-        return console.log("progress", arguments);
-      });
-      return get_data_url(file, function(data_url) {
-        thing = new Thing({
-          source: data_url
-        });
-        Inspector.current_item = thing;
-        return react.changed(Inspector, 'current_item');
-      });
+      a data url, or a file upload. */      return get_data_url(file, function(data_url) {});
+      /*new Thing
+          file:file
+          ready: (thing) ->
+              Inspector.current_item = thing
+              react.changed Inspector, 'current_item'
+      */
     });
     _results = [];
     for (_i = 0, _len = ITEMS.length; _i < _len; _i++) {
       item = ITEMS[_i];
-      item.position = point_from_postgres(item.position);
-      _results.push(new Thing(item));
+      _results.push(item.position = point_from_postgres(item.position));
     }
     return _results;
   });

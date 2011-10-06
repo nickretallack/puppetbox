@@ -8,3 +8,49 @@ Also it's a little over-complicated for what I'm doing.
 Flat Files per Room
 ---
 I could totally do it all with flat files.  Just keep everything in memory and debounce writes in case the server goes down and I'm good.  Hm.
+
+
+
+
+
+
+When a user pastes an image
+    Send a create object event
+    Set the image to ajax spinner (make that the default image)
+    Read as binary and hash the image.
+    When it's loaded
+        If it's new to this client
+            Do a head request for it
+            Ask the server if it knows about it
+                If the server knows
+                    have the server broadcast the url
+                If the server doesn't know
+                    Start uploading the image
+                    When the image upload finishes
+                        have the server broadcast its new url to all clients.
+        If we've used it before on this client
+            Use the cached image url
+
+
+
+
+de-duping
+-- use the data url?
+
+
+image / object
+
+When you paste a file, it should display as soon as possible using data urls.
+As soon as it's displayed, you can move it.
+
+
+
+You paste a file.  It uploads to the server.  The server then gives you a url for it.
+
+
+
+  You download it and display it.  
+
+
+
+

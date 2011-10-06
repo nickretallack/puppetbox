@@ -17,10 +17,27 @@ Inspector =
 
 
 class Thing
-    constructor: ({source:@source, position:@position, id:@id}) ->
+    constructor: ({file:@file, source:@source, position:@position, id:@id, ready:ready}) ->
         created = not @id
         @position ?= default_position()
         @id ?= Guid()
+
+        #### IF NOT.. SOMETHING
+        # load the data url first for quickness
+        get_data_url @file, (data_url) ->
+            @source = data_url
+            client_side_ready data_url
+            ready @
+
+        # but also upload the file, since this is quicker for others
+        # TODO: skip this if we know we already have this file
+        upload_file file, '/upload', (result) ->
+            @set_source "/uploads/#{result}"
+            @server_side_ready result
+        , ->
+            console.log "error", arguments
+        ,  ->
+            console.log "progress", arguments
 
         publish_movement = (offset, stopped=true) =>
             @position = 
@@ -37,17 +54,20 @@ class Thing
             Inspector.current_item = @
             react.changed Inspector, 'current_item'
 
-        things[@id] = @
-        @node = $ "<img src=\"#{@source}\">"
-        $('#play_area').append @node
-        @node.css
-            position:'absolute'
-        @move @position
-        @node.draggable
-            drag: (event, ui) -> publish_movement ui.offset, false
-            stop: (event, ui) -> publish_movement ui.offset, true
-            start: select_this
-        @node.click select_this
+        # Uh oh.  We could be emitting movement events before the thing is actually created.
+        # Can we send a preliminary creation message that gets there before the thing is uploaded?
+        client_side_ready = (source) ->
+            things[@id] = @
+            @node = $ "<img src=\"#{@source}\">"
+            $('#play_area').append @node
+            @node.css
+                position:'absolute'
+            @move @position
+            @node.draggable
+                drag: (event, ui) -> publish_movement ui.offset, false
+                stop: (event, ui) -> publish_movement ui.offset, true
+                start: select_this
+            @node.click select_this
 
         if created
             socket.publish "/#{ROOM}/create", 
@@ -55,6 +75,8 @@ class Thing
                 id:@id
                 source:@source
                 client_id:client_id
+
+    
 
     toJSON: ->
         position:@position
@@ -134,19 +156,23 @@ $ ->
         Lets display it using whatever method's faster:
         a data url, or a file upload. ###
 
-        thing = null
-        upload_file file, '/upload', (result) ->
-            thing.set_source "/uploads/#{result}"
-        , ->
-            console.log "error", arguments
-        ,  ->
-            console.log "progress", arguments
+        get_data_url file, (data_url) ->
+            # Now that I have the data url, I can create an image.
+            # This also tells me how large it is.
+            # Maybe it also tells me something about if it's a duplicate?
 
-        get_data_url file, (data_url) -> 
-            thing = new Thing source:data_url
-            Inspector.current_item = thing
-            react.changed Inspector, 'current_item'
+
+            # Hurr.  Perhaps for simplicity's sake we shouldn't send any creation data
+            # until the thing is successfully uploaded...
+
+
+        ###new Thing
+            file:file
+            ready: (thing) ->
+                Inspector.current_item = thing
+                react.changed Inspector, 'current_item'
+        ###
 
     for item in ITEMS
         item.position = point_from_postgres item.position
-        new Thing item
+        #new Thing item
