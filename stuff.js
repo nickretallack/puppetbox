@@ -1,5 +1,5 @@
 (function() {
-  var DEFAULT_IMAGE_URL, Image, Inspector, Thing, adjust_position, client_id, default_position, image_exists_serverside, image_from_file, image_name_to_url, images, point_from_postgres, read_file, socket, things;
+  var DEFAULT_IMAGE_URL, Image, Inspector, Thing, adjust_position, client_id, default_position, image_exists_serverside, image_from_file, image_name_to_url, images, point_from_postgres, read_file, socket, things, upload_file;
   var __indexOf = Array.prototype.indexOf || function(item) {
     for (var i = 0, l = this.length; i < l; i++) {
       if (this[i] === item) return i;
@@ -47,6 +47,7 @@
       var file_name, hash, image, url;
       hash = SHA256(binary);
       file_name = "" + hash + "." + extension;
+      file.name = file_name;
       url = image_name_to_url(file_name);
       if (__indexOf.call(images, hash) >= 0) {
         return loaded(images[hash]);
@@ -57,7 +58,7 @@
         image_exists_serverside(url, function() {
           return loaded(image);
         }, function() {
-          return upload_file(file, '/upload', function(result) {
+          return upload_file(file, hash, '/upload', function(result) {
             return loaded(image);
           }, function() {
             return console.log("error", arguments);
@@ -130,7 +131,7 @@
         this.node.click(select_this);
         image_from_file(this.file, __bind(function(image) {
           this.image = image;
-          return this.node.attr('src', this.image.src);
+          return this.node.attr('src', this.image.url);
         }, this));
       }
     }
@@ -262,4 +263,23 @@
     }
     return _results;
   });
+  upload_file = function(file, hash, url, success_handler, error_handler, update_progress_bar) {
+    var form_data, request;
+    request = new XMLHttpRequest();
+    request.upload.addEventListener("error", error_handler, false);
+    request.onreadystatechange = function() {
+      if (request.readyState === 4) {
+        if (request.status === 200) {
+          return success_handler(request.responseText);
+        } else {
+          return error_handler(request);
+        }
+      }
+    };
+    request.open("POST", url, true);
+    form_data = new FormData();
+    form_data.append('file', file);
+    form_data.append('hash', hash);
+    return request.send(form_data);
+  };
 }).call(this);

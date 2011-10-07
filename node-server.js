@@ -88,26 +88,27 @@
   };
   app.post('/upload', function(request, response, next) {
     return request.form.complete(function(error, fields, files) {
-      var extension, file, kind, _ref;
+      var extension, file, hash, kind, new_filename, new_path, _ref;
       if (error) {
         return next(error);
       }
       if (!(files.file != null)) {
         return;
       }
+      if (!(fields.hash != null)) {
+        return;
+      }
       file = files.file;
+      hash = fields.hash;
       _ref = file.type.split('/'), kind = _ref[0], extension = _ref[1];
       if (kind === !'image') {
         return response.end("Invalid file type: " + file.type);
       }
-      return hash_file(file, function(hash) {
-        var new_filename, new_path;
-        new_filename = "" + hash + "." + extension;
-        new_path = "" + UPLOAD_DIR + "/" + new_filename;
-        fs.rename(file.path, new_path);
-        console.log("Uploaded a file", new_path);
-        return response.end(new_filename);
-      });
+      new_filename = "" + hash + "." + extension;
+      new_path = "" + UPLOAD_DIR + "/" + new_filename;
+      fs.rename(file.path, new_path);
+      console.log("Uploaded a file", new_path);
+      return response.end(new_filename);
     });
   });
   create_item = function(_arg) {

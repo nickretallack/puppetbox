@@ -87,17 +87,18 @@ app.post '/upload', (request, response, next) ->
     request.form.complete (error, fields, files) ->
         return next error if error
         return if not files.file?
+        return if not fields.hash?
         file = files.file
+        hash = fields.hash
         [kind, extension] = file.type.split '/'
         return response.end "Invalid file type: #{file.type}" if kind is not 'image'
-        hash_file file, (hash) ->
-            new_filename = "#{hash}.#{extension}"
-            new_path = "#{UPLOAD_DIR}/#{new_filename}"
-            fs.rename file.path, new_path
-            console.log "Uploaded a file", new_path
-            response.end new_filename
-            # TODO: notify us
-            # TODO: add to persistence (images table)
+        new_filename = "#{hash}.#{extension}"
+        new_path = "#{UPLOAD_DIR}/#{new_filename}"
+        fs.rename file.path, new_path
+        console.log "Uploaded a file", new_path
+        response.end new_filename
+        # TODO: notify us
+        # TODO: add to persistence (images table)
 
             
 create_item = ({room_id, item_id, position}) ->

@@ -32,6 +32,7 @@ image_from_file = (file, loaded) ->
     read_file file, 'binary', (binary) ->
         hash = SHA256 binary
         file_name = "#{hash}.#{extension}"
+        file.name = file_name
         url = image_name_to_url file_name
         if hash in images
             loaded images[hash]
@@ -44,7 +45,7 @@ image_from_file = (file, loaded) ->
                 loaded image
             , ->
                 # We need to upload it
-                upload_file file, '/upload', (result) ->
+                upload_file file, hash, '/upload', (result) ->
                     loaded image
                 , ->
                     console.log "error", arguments
@@ -96,7 +97,7 @@ class Thing
             @node.click select_this
 
             image_from_file @file, (@image) =>
-                @node.attr 'src', @image.src
+                @node.attr 'src', @image.url
 
     toJSON: ->
         position:@position
@@ -180,3 +181,23 @@ $ ->
     for item in ITEMS
         item.position = point_from_postgres item.position
         #new Thing item
+
+
+upload_file = (file, hash, url, success_handler, error_handler, update_progress_bar) ->
+    request = new XMLHttpRequest();
+    #monitor_progress(request, update_progress_bar)
+    request.upload.addEventListener("error", error_handler, false);
+
+    request.onreadystatechange = ->
+        if request.readyState is 4  # DONE
+            if request.status is 200 # SUCCESS
+                success_handler(request.responseText)
+            else # FAILURE
+                error_handler(request)
+
+    request.open("POST", url, true); # Last parameter may not be necessary
+
+    form_data = new FormData();
+    form_data.append('file', file);
+    form_data.append('hash', hash);
+    request.send(form_data);
