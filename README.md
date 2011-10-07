@@ -20,8 +20,8 @@ Todos:
 * Debounce database writes for movement [DONE]
 * Selection info panel on the side [DONE]
 * Delete objects [DONE]
-* Work with real image files instead of just data urls
-* De-dup images using hashes
+* Work with real image files instead of just data urls [DONE]
+* De-dup images using hashes [DONE]
 * Move objects up/down in the stacking order
 * Select multiple objects and manipulate them together
 * Repeatedly stamp down the same image
