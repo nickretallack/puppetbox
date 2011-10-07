@@ -29,7 +29,9 @@ var ITEMS = JSON.parse('<%- items %>')
     <div id="inspector" react="showIf current_item">
         <button id="delete">Remove</button>
         <button id="clone">Copy</button>
+        <div id="current_image_box">
         <img id="current_image" react="attr 'src' current_item.url">
+        </div>
     </div>
 </nav>
 </body>
