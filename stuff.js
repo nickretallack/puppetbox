@@ -39,7 +39,7 @@
   image_name_to_url = function(file_name) {
     return "/uploads/" + file_name;
   };
-  image_from_file = function(file, item_id, loaded) {
+  image_from_file = function(file, loaded) {
     /* First we read the file into a string so we can make an
     sha256 hash of it.  */    var extension, kind, _ref;
     _ref = file.type.split('/'), kind = _ref[0], extension = _ref[1];
@@ -51,14 +51,15 @@
       if (__indexOf.call(images, hash) >= 0) {
         return loaded(images[hash]);
       } else {
-        image = new Image;
-        image.url = url;
-        image.name = file_name;
-        images[hash] = image;
+        image = new Image({
+          url: url,
+          name: file_name,
+          hash: hash
+        });
         image_exists_serverside(url, function() {
           return loaded(image);
         }, function() {
-          return upload_file(file, hash, item_id, '/upload', function(result) {
+          return upload_file(file, item_id, '/upload', function(result) {
             return loaded(image);
           }, function() {
             return console.log("error", arguments);
@@ -71,14 +72,17 @@
     });
   };
   Image = (function() {
-    function Image() {}
+    function Image(_arg) {
+      this.url = _arg.url, this.name = _arg.name, this.hash = _arg.hash;
+      images[this.hash] = this;
+    }
     return Image;
   })();
   DEFAULT_IMAGE_URL = "/uploads/default.gif";
   Thing = (function() {
     function Thing(_arg) {
-      var created, publish_movement, select_this, url, _ref, _ref2;
-      this.file = _arg.file, this.position = _arg.position, this.id = _arg.id, url = _arg.url;
+      var created, publish_movement, select_this, _ref, _ref2;
+      this.file = _arg.file, this.position = _arg.position, this.id = _arg.id, this.image = _arg.image, this.url = _arg.url;
             if ((_ref = this.position) != null) {
         _ref;
       } else {
@@ -114,11 +118,17 @@
         socket.publish("/" + ROOM + "/create", {
           position: this.position,
           id: this.id,
+          url: this.url,
           client_id: client_id
         });
+      }
+      if (this.url) {
+        this.node = $("<img src=\"" + this.url + "\">");
+      } else if (this.file) {
         this.node = $("<img src=\"" + DEFAULT_IMAGE_URL + "\">");
-        image_from_file(this.file, this.id, __bind(function(image) {
+        image_from_file(this.file, __bind(function(image) {
           this.image = image;
+          this.url = this.image.url;
           this.node.attr('src', this.image.url);
           return socket.publish("/" + ROOM + "/set_image_url", {
             id: this.id,
@@ -126,8 +136,6 @@
             client_id: client_id
           });
         }, this));
-      } else {
-        this.node = $("<img src=\"" + url + "\">");
       }
       $('#play_area').append(this.node);
       this.move(this.position);
@@ -172,7 +180,7 @@
       };
       return new Thing({
         position: new_position,
-        source: this.source
+        url: this.url
       });
     };
     Thing.prototype.set_source = function(source) {
@@ -192,15 +200,15 @@
     return thing.move(position);
   });
   socket.subscribe("/" + ROOM + "/create", function(_arg) {
-    var id, position, the_client_id, thing;
-    id = _arg.id, position = _arg.position, the_client_id = _arg.client_id;
+    var id, position, the_client_id, thing, url;
+    id = _arg.id, position = _arg.position, url = _arg.url, the_client_id = _arg.client_id;
     if (the_client_id === client_id) {
       return;
     }
     return thing = new Thing({
       id: id,
       position: position,
-      url: DEFAULT_IMAGE_URL
+      url: url || DEFAULT_IMAGE_URL
     });
   });
   socket.subscribe("/" + ROOM + "/set_image_url", function(_arg) {
@@ -281,7 +289,7 @@
     }
     return _results;
   });
-  upload_file = function(file, hash, item_id, url, success_handler, error_handler, update_progress_bar) {
+  upload_file = function(file, hash, url, success_handler, error_handler, update_progress_bar) {
     var form_data, request;
     request = new XMLHttpRequest();
     request.upload.addEventListener("error", error_handler, false);
@@ -298,7 +306,6 @@
     form_data = new FormData();
     form_data.append('file', file);
     form_data.append('hash', hash);
-    form_data.append('item_id', item_id);
     return request.send(form_data);
   };
 }).call(this);

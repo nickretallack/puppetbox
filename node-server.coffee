@@ -100,8 +100,8 @@ app.post '/upload', (request, response, next) ->
         # TODO: add to persistence (images table)
 
             
-create_item = ({room_id, item_id, position}) ->
-    image_id = 'default.gif'
+create_item = ({room_id, item_id, position, url}) ->
+    image_id = url or 'default.gif'
     Flow().seq (next) ->
         db.query "begin", next
     .seq (next) ->
@@ -151,6 +151,7 @@ Persistence =
                     room_id:room_id
                     item_id:message.data.id
                     position:message.data.position
+                    url:message.data.url
             if command is 'move'
                 move_item
                     room_id:room_id

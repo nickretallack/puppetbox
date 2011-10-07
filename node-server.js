@@ -109,9 +109,9 @@
     });
   });
   create_item = function(_arg) {
-    var image_id, item_id, position, room_id;
-    room_id = _arg.room_id, item_id = _arg.item_id, position = _arg.position;
-    image_id = 'default.gif';
+    var image_id, item_id, position, room_id, url;
+    room_id = _arg.room_id, item_id = _arg.item_id, position = _arg.position, url = _arg.url;
+    image_id = url || 'default.gif';
     return Flow().seq(function(next) {
       return db.query("begin", next);
     }).seq(function(next) {
@@ -173,7 +173,8 @@
           create_item({
             room_id: room_id,
             item_id: message.data.id,
-            position: message.data.position
+            position: message.data.position,
+            url: message.data.url
           });
         }
         if (command === 'move') {

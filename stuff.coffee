@@ -25,7 +25,7 @@ image_exists_serverside = (url, there, not_there) ->
 
 image_name_to_url = (file_name) -> "/uploads/#{file_name}"
 
-image_from_file = (file, item_id, loaded) ->
+image_from_file = (file, loaded) ->
     ### First we read the file into a string so we can make an
     sha256 hash of it.  ###
     [kind, extension] = file.type.split '/'
@@ -37,15 +37,15 @@ image_from_file = (file, item_id, loaded) ->
             loaded images[hash]
         else
             image = new Image
-            image.url = url
-            image.name = file_name
-            images[hash] = image
+                url:url
+                name:file_name
+                hash:hash
             image_exists_serverside url, ->
                 # It's already uploaded
                 loaded image
             , ->
                 # We need to upload it
-                upload_file file, hash, item_id, '/upload', (result) ->
+                upload_file file, item_id, '/upload', (result) ->
                     loaded image
                 , ->
                     console.log "error", arguments
@@ -55,11 +55,13 @@ image_from_file = (file, item_id, loaded) ->
             images[hash] = @
 
 class Image
+    constructor: ({url:@url, name:@name, hash:@hash}) ->
+        images[@hash] = @
 
 DEFAULT_IMAGE_URL = "/uploads/default.gif"
 
 class Thing
-    constructor: ({file:@file, position:@position, id:@id, url:url}) ->
+    constructor: ({file:@file, position:@position, id:@id, image:@image, url:@url}) ->
         @position ?= default_position()
         created = not @id
         @id ?= Guid()
@@ -85,18 +87,20 @@ class Thing
             socket.publish "/#{ROOM}/create",
                 position:@position
                 id:@id
+                url:@url
                 client_id:client_id
 
+        if @url
+            @node = $ "<img src=\"#{@url}\">"
+        else if @file
             @node = $ "<img src=\"#{DEFAULT_IMAGE_URL}\">"
-            image_from_file @file, @id, (@image) =>
+            image_from_file @file, (@image) =>
+                @url = @image.url
                 @node.attr 'src', @image.url
                 socket.publish "/#{ROOM}/set_image_url",
                     id:@id
                     url:@image.name
                     client_id:client_id
-                    
-        else
-            @node = $ "<img src=\"#{url}\">"
             
         $('#play_area').append @node
         @move @position
@@ -130,7 +134,7 @@ class Thing
             top:@position.top + 10
         new Thing
             position:new_position
-            source:@source
+            url:@url
 
     set_source: (@source) ->
         @node.attr 'src', @source
@@ -142,12 +146,12 @@ socket.subscribe "/#{ROOM}/move", ({id,position,client_id:the_client_id}) ->
     thing = things[id]
     thing.move position
     
-socket.subscribe "/#{ROOM}/create", ({id, position, client_id:the_client_id}) ->
+socket.subscribe "/#{ROOM}/create", ({id, position, url, client_id:the_client_id}) ->
     return if the_client_id is client_id
     thing = new Thing
         id:id
         position:position
-        url:DEFAULT_IMAGE_URL
+        url:url or DEFAULT_IMAGE_URL
 
 socket.subscribe "/#{ROOM}/set_image_url", ({id, url, client_id:the_client_id}) ->
     return if the_client_id is client_id
@@ -198,7 +202,7 @@ $ ->
         new Thing item
 
 
-upload_file = (file, hash, item_id, url, success_handler, error_handler, update_progress_bar) ->
+upload_file = (file, hash, url, success_handler, error_handler, update_progress_bar) ->
     request = new XMLHttpRequest();
     #monitor_progress(request, update_progress_bar)
     request.upload.addEventListener("error", error_handler, false);
@@ -215,5 +219,4 @@ upload_file = (file, hash, item_id, url, success_handler, error_handler, update_
     form_data = new FormData();
     form_data.append('file', file);
     form_data.append('hash', hash);
-    form_data.append('item_id', item_id);
     request.send(form_data);
