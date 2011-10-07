@@ -1,4 +1,5 @@
 #side_panel {position:fixed; left:0; top:0; bottom:0; width:300px; background:rgb(250,250,250)}
 #play_area {position:fixed; left:300px; top:0; bottom:0; right:0}
+#play_area img {position:absolute}
 #current_image {max-width:300px; max-height:300px; display:inline-block; vertical-align:middle}
 #current_image_box {height:300px; width:300px;}

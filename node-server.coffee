@@ -13,6 +13,7 @@ form = require 'connect-form'
 fs = require 'fs'
 crypto = require 'crypto'
 util = require 'util'
+sha256 = require('./library/standard/sha256').sha256
 UPLOAD_DIR = "#{__dirname}/uploads"
 
 
@@ -38,6 +39,7 @@ app.get '/play/:room', (request, response) ->
     room_name = request.params.room
     room_id = null
 
+    # TODO: this needs some serious work.  Make it separate images from things
     Flow().seq (next) ->
         db.query "select * from room where name = $1", [room_name], next
     .seq (next, result) ->
@@ -48,8 +50,7 @@ app.get '/play/:room', (request, response) ->
             room_id = result.rows[0].id
             next()
     .seq (next) ->
-        db.query """select item.id, item.position, image.source from item
-            join image on item.room_id = $1 and image.id = item.image_id""", [room_id], next
+        db.query """select item.id as id, item.position as position, item.image_id as url from item where item.room_id = $1""", [room_id], next
     .seq (next, result) ->
         response.render 'room.ejs',
             layout:false
@@ -60,6 +61,28 @@ rsplit = (string, delimiter) ->
     split_index = string.lastIndexOf delimiter
     [string[0...split_index], string[split_index..-1]]
 
+hash_file = (file, callback) ->
+    fs.readFile file.path, (error, data) ->
+        throw error if error
+        callback sha256 data + ''
+
+# unused for now
+hash_big_file = (file, callback) ->
+    hash = crypto.createHash 'sha256'
+    stream = fs.createReadStream file.path,
+        encoding:'binary'
+    stream.addListener 'data', (chunk) ->
+        hash.update chunk
+
+        # lets look at the hex
+        hex = []
+        for byte, index in chunk
+            hex.push chunk.charCodeAt(index).toString 16
+        console.log hex.join ' '
+    stream.addListener 'close', ->
+        digest = hash.digest 'hex'
+        callback digest
+
 app.post '/upload', (request, response, next) ->
     request.form.complete (error, fields, files) ->
         return next error if error
@@ -67,28 +90,20 @@ app.post '/upload', (request, response, next) ->
         file = files.file
         [kind, extension] = file.type.split '/'
         return response.end "Invalid file type: #{file.type}" if kind is not 'image'
-        hash = crypto.createHash 'sha256'
-        stream = fs.createReadStream file.path,
-            encoding:'binary'
-        stream.addListener 'data', (chunk) ->
-            hash.update chunk
-        stream.addListener 'close', ->
-            digest = hash.digest 'hex'
-            new_filename = "#{digest}.#{extension}"
+        hash_file file, (hash) ->
+            new_filename = "#{hash}.#{extension}"
             new_path = "#{UPLOAD_DIR}/#{new_filename}"
             fs.rename file.path, new_path
+            console.log "Uploaded a file", new_path
             response.end new_filename
+            # TODO: notify us
+            # TODO: add to persistence (images table)
+
             
-    
-
-
-create_item = ({room_id, item_id, source, position}) ->
-    image_id = Guid() # TODO: test for duplicate image
+create_item = ({room_id, item_id, position}) ->
+    image_id = 'default.gif'
     Flow().seq (next) ->
         db.query "begin", next
-    .seq (next) ->
-        db.query """insert into image (id, source) values ($1, $2)""", 
-            [image_id, source], next
     .seq (next) ->
         db.query """insert into item (id, room_id, image_id, position) 
             values ($1, $2, $3, $4)""",
@@ -119,7 +134,6 @@ Persistence =
                 create_item
                     room_id:room_id
                     item_id:message.data.id
-                    source:message.data.source
                     position:message.data.position
             if command is 'move'
                 move_item

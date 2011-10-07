@@ -1,5 +1,6 @@
 #ROOM = window.location.pathname.slice 1
 things = {}
+images = {}
 client_id = Guid()
 
 adjust_position = ({left, top}) ->
@@ -11,34 +12,59 @@ default_position = ->
         left:Mouse.location.x()
         top:Mouse.location.y()
 
-Inspector = 
+Inspector =
     current_item:null
 
+image_exists_serverside = (url, there, not_there) ->
+    $.ajax
+        type:'head'
+        url:url
+        statusCode:
+            200: there
+            404: not_there
 
+image_name_to_url = (file_name) -> "/uploads/#{file_name}"
+
+image_from_file = (file, loaded) ->
+    ### First we read the file into a string so we can make an
+    sha256 hash of it.  ###
+    [kind, extension] = file.type.split '/'
+    read_file file, 'binary', (binary) ->
+        hash = SHA256 binary
+        file_name = "#{hash}.#{extension}"
+        url = image_name_to_url file_name
+        if hash in images
+            loaded images[hash]
+        else
+            image = new Image
+            image.url = url
+            images[hash] = image
+            image_exists_serverside url, ->
+                # It's already uploaded
+                loaded image
+            , ->
+                # We need to upload it
+                upload_file file, '/upload', (result) ->
+                    loaded image
+                , ->
+                    console.log "error", arguments
+                , ->
+                    console.log "progress", arguments
+
+            images[hash] = @
+
+class Image
+
+DEFAULT_IMAGE_URL = "/uploads/default.gif"
 
 class Thing
-    constructor: ({file:@file, source:@source, position:@position, id:@id, ready:ready}) ->
-        created = not @id
+    constructor: ({file:@file, position:@position, id:@id, ready:ready}) ->
         @position ?= default_position()
+        created = not @id
         @id ?= Guid()
+        things[@id] = @
 
-        #### IF NOT.. SOMETHING
-        # load the data url first for quickness
-        get_data_url @file, (data_url) ->
-            @source = data_url
-            client_side_ready data_url
-            ready @
-
-        # but also upload the file, since this is quicker for others
-        # TODO: skip this if we know we already have this file
-        upload_file file, '/upload', (result) ->
-            @set_source "/uploads/#{result}"
-            @server_side_ready result
-        , ->
-            console.log "error", arguments
-        ,  ->
-            console.log "progress", arguments
-
+        # TODO: make these methods?
         publish_movement = (offset, stopped=true) =>
             @position = 
                 adjust_position
@@ -54,14 +80,14 @@ class Thing
             Inspector.current_item = @
             react.changed Inspector, 'current_item'
 
-        # Uh oh.  We could be emitting movement events before the thing is actually created.
-        # Can we send a preliminary creation message that gets there before the thing is uploaded?
-        client_side_ready = (source) ->
-            things[@id] = @
-            @node = $ "<img src=\"#{@source}\">"
+        if created
+            socket.publish "/#{ROOM}/create", 
+                position:@position
+                id:@id
+                client_id:client_id
+
+            @node = $ "<img src=\"#{DEFAULT_IMAGE_URL}\">"
             $('#play_area').append @node
-            @node.css
-                position:'absolute'
             @move @position
             @node.draggable
                 drag: (event, ui) -> publish_movement ui.offset, false
@@ -69,14 +95,8 @@ class Thing
                 start: select_this
             @node.click select_this
 
-        if created
-            socket.publish "/#{ROOM}/create", 
-                position:@position
-                id:@id
-                source:@source
-                client_id:client_id
-
-    
+            image_from_file @file, (@image) =>
+                @node.attr 'src', @image.src
 
     toJSON: ->
         position:@position
@@ -129,11 +149,14 @@ point_from_postgres = (string) ->
     components = (parseInt component for component in string[1...-1].split ',')
     {left:components[0], top:components[1]}
 
-
-get_data_url = (file, callback) ->
+read_file = (file, format_name, callback) ->
+    formats =
+        binary:'readAsBinaryString'
+        url:'readAsDataUrl'
+    format = formats[format_name]
     reader = new FileReader()
     reader.onload = (event) -> callback event.target.result
-    reader.readAsDataURL(file)
+    reader[format](file)
 
 $ ->
     react.update
@@ -152,26 +175,7 @@ $ ->
 
 
     $("html").pasteImageReader (file) ->
-        ### A new file!
-        Lets display it using whatever method's faster:
-        a data url, or a file upload. ###
-
-        get_data_url file, (data_url) ->
-            # Now that I have the data url, I can create an image.
-            # This also tells me how large it is.
-            # Maybe it also tells me something about if it's a duplicate?
-
-
-            # Hurr.  Perhaps for simplicity's sake we shouldn't send any creation data
-            # until the thing is successfully uploaded...
-
-
-        ###new Thing
-            file:file
-            ready: (thing) ->
-                Inspector.current_item = thing
-                react.changed Inspector, 'current_item'
-        ###
+        new Thing file:file
 
     for item in ITEMS
         item.position = point_from_postgres item.position

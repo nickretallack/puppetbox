@@ -1,5 +1,5 @@
 (function() {
-  var Faye, Flow, Guid, Persistence, UPLOAD_DIR, app, create_item, crypto, db, db_uri, delay, delete_item, express, faye, form, fs, move_item, pg, pg_client, port, postgres_point, rsplit, util;
+  var Faye, Flow, Guid, Persistence, UPLOAD_DIR, app, create_item, crypto, db, db_uri, delay, delete_item, express, faye, form, fs, hash_big_file, hash_file, move_item, pg, pg_client, port, postgres_point, rsplit, sha256, util;
   port = 5000;
   db_uri = process.env.PUPPETBOX_DB_URI;
   express = require('express');
@@ -12,6 +12,7 @@
   fs = require('fs');
   crypto = require('crypto');
   util = require('util');
+  sha256 = require('./library/standard/sha256').sha256;
   UPLOAD_DIR = "" + __dirname + "/uploads";
   app = express.createServer();
   app.use(express.static(__dirname));
@@ -41,7 +42,7 @@
         return next();
       }
     }).seq(function(next) {
-      return db.query("select item.id, item.position, image.source from item\njoin image on item.room_id = $1 and image.id = item.image_id", [room_id], next);
+      return db.query("select item.id as id, item.position as position, item.image_id as url from item where item.room_id = $1", [room_id], next);
     }).seq(function(next, result) {
       return response.render('room.ejs', {
         layout: false,
@@ -55,9 +56,39 @@
     split_index = string.lastIndexOf(delimiter);
     return [string.slice(0, split_index), string.slice(split_index)];
   };
+  hash_file = function(file, callback) {
+    return fs.readFile(file.path, function(error, data) {
+      if (error) {
+        throw error;
+      }
+      return callback(sha256(data + ''));
+    });
+  };
+  hash_big_file = function(file, callback) {
+    var hash, stream;
+    hash = crypto.createHash('sha256');
+    stream = fs.createReadStream(file.path, {
+      encoding: 'binary'
+    });
+    stream.addListener('data', function(chunk) {
+      var byte, hex, index, _len;
+      hash.update(chunk);
+      hex = [];
+      for (index = 0, _len = chunk.length; index < _len; index++) {
+        byte = chunk[index];
+        hex.push(chunk.charCodeAt(index).toString(16));
+      }
+      return console.log(hex.join(' '));
+    });
+    return stream.addListener('close', function() {
+      var digest;
+      digest = hash.digest('hex');
+      return callback(digest);
+    });
+  };
   app.post('/upload', function(request, response, next) {
     return request.form.complete(function(error, fields, files) {
-      var extension, file, hash, kind, stream, _ref;
+      var extension, file, kind, _ref;
       if (error) {
         return next(error);
       }
@@ -69,31 +100,22 @@
       if (kind === !'image') {
         return response.end("Invalid file type: " + file.type);
       }
-      hash = crypto.createHash('sha256');
-      stream = fs.createReadStream(file.path, {
-        encoding: 'binary'
-      });
-      stream.addListener('data', function(chunk) {
-        return hash.update(chunk);
-      });
-      return stream.addListener('close', function() {
-        var digest, new_filename, new_path;
-        digest = hash.digest('hex');
-        new_filename = "" + digest + "." + extension;
+      return hash_file(file, function(hash) {
+        var new_filename, new_path;
+        new_filename = "" + hash + "." + extension;
         new_path = "" + UPLOAD_DIR + "/" + new_filename;
         fs.rename(file.path, new_path);
+        console.log("Uploaded a file", new_path);
         return response.end(new_filename);
       });
     });
   });
   create_item = function(_arg) {
-    var image_id, item_id, position, room_id, source;
-    room_id = _arg.room_id, item_id = _arg.item_id, source = _arg.source, position = _arg.position;
-    image_id = Guid();
+    var image_id, item_id, position, room_id;
+    room_id = _arg.room_id, item_id = _arg.item_id, position = _arg.position;
+    image_id = 'default.gif';
     return Flow().seq(function(next) {
       return db.query("begin", next);
-    }).seq(function(next) {
-      return db.query("insert into image (id, source) values ($1, $2)", [image_id, source], next);
     }).seq(function(next) {
       return db.query("insert into item (id, room_id, image_id, position) \nvalues ($1, $2, $3, $4)", [item_id, room_id, image_id, postgres_point(position)], next);
     }).seq(function(next) {
@@ -133,7 +155,6 @@
           create_item({
             room_id: room_id,
             item_id: message.data.id,
-            source: message.data.source,
             position: message.data.position
           });
         }

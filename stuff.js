@@ -1,7 +1,13 @@
 (function() {
-  var Inspector, Thing, adjust_position, client_id, default_position, get_data_url, point_from_postgres, socket, things;
-  var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+  var DEFAULT_IMAGE_URL, Image, Inspector, Thing, adjust_position, client_id, default_position, image_exists_serverside, image_from_file, image_name_to_url, images, point_from_postgres, read_file, socket, things;
+  var __indexOf = Array.prototype.indexOf || function(item) {
+    for (var i = 0, l = this.length; i < l; i++) {
+      if (this[i] === item) return i;
+    }
+    return -1;
+  }, __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   things = {};
+  images = {};
   client_id = Guid();
   adjust_position = function(_arg) {
     var left, top;
@@ -20,34 +26,70 @@
   Inspector = {
     current_item: null
   };
+  image_exists_serverside = function(url, there, not_there) {
+    return $.ajax({
+      type: 'head',
+      url: url,
+      statusCode: {
+        200: there,
+        404: not_there
+      }
+    });
+  };
+  image_name_to_url = function(file_name) {
+    return "/uploads/" + file_name;
+  };
+  image_from_file = function(file, loaded) {
+    /* First we read the file into a string so we can make an
+    sha256 hash of it.  */    var extension, kind, _ref;
+    _ref = file.type.split('/'), kind = _ref[0], extension = _ref[1];
+    return read_file(file, 'binary', function(binary) {
+      var file_name, hash, image, url;
+      hash = SHA256(binary);
+      file_name = "" + hash + "." + extension;
+      url = image_name_to_url(file_name);
+      if (__indexOf.call(images, hash) >= 0) {
+        return loaded(images[hash]);
+      } else {
+        image = new Image;
+        image.url = url;
+        images[hash] = image;
+        image_exists_serverside(url, function() {
+          return loaded(image);
+        }, function() {
+          return upload_file(file, '/upload', function(result) {
+            return loaded(image);
+          }, function() {
+            return console.log("error", arguments);
+          }, function() {
+            return console.log("progress", arguments);
+          });
+        });
+        return images[hash] = this;
+      }
+    });
+  };
+  Image = (function() {
+    function Image() {}
+    return Image;
+  })();
+  DEFAULT_IMAGE_URL = "/uploads/default.gif";
   Thing = (function() {
     function Thing(_arg) {
-      var client_side_ready, created, publish_movement, ready, select_this, _ref, _ref2;
-      this.file = _arg.file, this.source = _arg.source, this.position = _arg.position, this.id = _arg.id, ready = _arg.ready;
-      created = !this.id;
+      var created, publish_movement, ready, select_this, _ref, _ref2;
+      this.file = _arg.file, this.position = _arg.position, this.id = _arg.id, ready = _arg.ready;
             if ((_ref = this.position) != null) {
         _ref;
       } else {
         this.position = default_position();
       };
+      created = !this.id;
             if ((_ref2 = this.id) != null) {
         _ref2;
       } else {
         this.id = Guid();
       };
-      get_data_url(this.file, function(data_url) {
-        this.source = data_url;
-        client_side_ready(data_url);
-        return ready(this);
-      });
-      upload_file(file, '/upload', function(result) {
-        this.set_source("/uploads/" + result);
-        return this.server_side_ready(result);
-      }, function() {
-        return console.log("error", arguments);
-      }, function() {
-        return console.log("progress", arguments);
-      });
+      things[this.id] = this;
       publish_movement = __bind(function(offset, stopped) {
         if (stopped == null) {
           stopped = true;
@@ -67,13 +109,14 @@
         Inspector.current_item = this;
         return react.changed(Inspector, 'current_item');
       }, this);
-      client_side_ready = function(source) {
-        things[this.id] = this;
-        this.node = $("<img src=\"" + this.source + "\">");
-        $('#play_area').append(this.node);
-        this.node.css({
-          position: 'absolute'
+      if (created) {
+        socket.publish("/" + ROOM + "/create", {
+          position: this.position,
+          id: this.id,
+          client_id: client_id
         });
+        this.node = $("<img src=\"" + DEFAULT_IMAGE_URL + "\">");
+        $('#play_area').append(this.node);
         this.move(this.position);
         this.node.draggable({
           drag: function(event, ui) {
@@ -84,15 +127,11 @@
           },
           start: select_this
         });
-        return this.node.click(select_this);
-      };
-      if (created) {
-        socket.publish("/" + ROOM + "/create", {
-          position: this.position,
-          id: this.id,
-          source: this.source,
-          client_id: client_id
-        });
+        this.node.click(select_this);
+        image_from_file(this.file, __bind(function(image) {
+          this.image = image;
+          return this.node.attr('src', this.image.src);
+        }, this));
       }
     }
     Thing.prototype.toJSON = function() {
@@ -182,13 +221,18 @@
       top: components[1]
     };
   };
-  get_data_url = function(file, callback) {
-    var reader;
+  read_file = function(file, format_name, callback) {
+    var format, formats, reader;
+    formats = {
+      binary: 'readAsBinaryString',
+      url: 'readAsDataUrl'
+    };
+    format = formats[format_name];
     reader = new FileReader();
     reader.onload = function(event) {
       return callback(event.target.result);
     };
-    return reader.readAsDataURL(file);
+    return reader[format](file);
   };
   $(function() {
     var item, _i, _len, _results;
@@ -207,15 +251,9 @@
       return react.changed(Inspector, 'current_item');
     });
     $("html").pasteImageReader(function(file) {
-      /* A new file!
-      Lets display it using whatever method's faster:
-      a data url, or a file upload. */      return get_data_url(file, function(data_url) {});
-      /*new Thing
-          file:file
-          ready: (thing) ->
-              Inspector.current_item = thing
-              react.changed Inspector, 'current_item'
-      */
+      return new Thing({
+        file: file
+      });
     });
     _results = [];
     for (_i = 0, _len = ITEMS.length; _i < _len; _i++) {
