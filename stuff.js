@@ -39,7 +39,7 @@
   image_name_to_url = function(file_name) {
     return "/uploads/" + file_name;
   };
-  image_from_file = function(file, loaded) {
+  image_from_file = function(file, item_id, loaded) {
     /* First we read the file into a string so we can make an
     sha256 hash of it.  */    var extension, kind, _ref;
     _ref = file.type.split('/'), kind = _ref[0], extension = _ref[1];
@@ -47,18 +47,18 @@
       var file_name, hash, image, url;
       hash = SHA256(binary);
       file_name = "" + hash + "." + extension;
-      file.name = file_name;
       url = image_name_to_url(file_name);
       if (__indexOf.call(images, hash) >= 0) {
         return loaded(images[hash]);
       } else {
         image = new Image;
         image.url = url;
+        image.name = file_name;
         images[hash] = image;
         image_exists_serverside(url, function() {
           return loaded(image);
         }, function() {
-          return upload_file(file, hash, '/upload', function(result) {
+          return upload_file(file, hash, item_id, '/upload', function(result) {
             return loaded(image);
           }, function() {
             return console.log("error", arguments);
@@ -77,8 +77,8 @@
   DEFAULT_IMAGE_URL = "/uploads/default.gif";
   Thing = (function() {
     function Thing(_arg) {
-      var created, publish_movement, ready, select_this, _ref, _ref2;
-      this.file = _arg.file, this.position = _arg.position, this.id = _arg.id, ready = _arg.ready;
+      var created, publish_movement, select_this, url, _ref, _ref2;
+      this.file = _arg.file, this.position = _arg.position, this.id = _arg.id, url = _arg.url;
             if ((_ref = this.position) != null) {
         _ref;
       } else {
@@ -117,23 +117,30 @@
           client_id: client_id
         });
         this.node = $("<img src=\"" + DEFAULT_IMAGE_URL + "\">");
-        $('#play_area').append(this.node);
-        this.move(this.position);
-        this.node.draggable({
-          drag: function(event, ui) {
-            return publish_movement(ui.offset, false);
-          },
-          stop: function(event, ui) {
-            return publish_movement(ui.offset, true);
-          },
-          start: select_this
-        });
-        this.node.click(select_this);
-        image_from_file(this.file, __bind(function(image) {
+        image_from_file(this.file, this.id, __bind(function(image) {
           this.image = image;
-          return this.node.attr('src', this.image.url);
+          this.node.attr('src', this.image.url);
+          return socket.publish("/" + ROOM + "/set_image_url", {
+            id: this.id,
+            url: this.image.name,
+            client_id: client_id
+          });
         }, this));
+      } else {
+        this.node = $("<img src=\"" + url + "\">");
       }
+      $('#play_area').append(this.node);
+      this.move(this.position);
+      this.node.draggable({
+        drag: function(event, ui) {
+          return publish_movement(ui.offset, false);
+        },
+        stop: function(event, ui) {
+          return publish_movement(ui.offset, true);
+        },
+        start: select_this
+      });
+      this.node.click(select_this);
     }
     Thing.prototype.toJSON = function() {
       return {
@@ -185,16 +192,25 @@
     return thing.move(position);
   });
   socket.subscribe("/" + ROOM + "/create", function(_arg) {
-    var id, position, source, the_client_id, thing;
-    id = _arg.id, position = _arg.position, source = _arg.source, the_client_id = _arg.client_id;
+    var id, position, the_client_id, thing;
+    id = _arg.id, position = _arg.position, the_client_id = _arg.client_id;
     if (the_client_id === client_id) {
       return;
     }
     return thing = new Thing({
       id: id,
       position: position,
-      source: source
+      url: DEFAULT_IMAGE_URL
     });
+  });
+  socket.subscribe("/" + ROOM + "/set_image_url", function(_arg) {
+    var id, the_client_id, thing, url;
+    id = _arg.id, url = _arg.url, the_client_id = _arg.client_id;
+    if (the_client_id === client_id) {
+      return;
+    }
+    thing = things[id];
+    return thing.set_source(image_name_to_url(url));
   });
   socket.subscribe("/" + ROOM + "/destroy", function(_arg) {
     var id, the_client_id, thing;
@@ -259,11 +275,13 @@
     _results = [];
     for (_i = 0, _len = ITEMS.length; _i < _len; _i++) {
       item = ITEMS[_i];
-      _results.push(item.position = point_from_postgres(item.position));
+      item.position = point_from_postgres(item.position);
+      item.url = image_name_to_url(item.url);
+      _results.push(new Thing(item));
     }
     return _results;
   });
-  upload_file = function(file, hash, url, success_handler, error_handler, update_progress_bar) {
+  upload_file = function(file, hash, item_id, url, success_handler, error_handler, update_progress_bar) {
     var form_data, request;
     request = new XMLHttpRequest();
     request.upload.addEventListener("error", error_handler, false);
@@ -280,6 +298,7 @@
     form_data = new FormData();
     form_data.append('file', file);
     form_data.append('hash', hash);
+    form_data.append('item_id', item_id);
     return request.send(form_data);
   };
 }).call(this);

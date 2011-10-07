@@ -86,8 +86,7 @@ hash_big_file = (file, callback) ->
 app.post '/upload', (request, response, next) ->
     request.form.complete (error, fields, files) ->
         return next error if error
-        return if not files.file?
-        return if not fields.hash?
+        return if not (files.file? and fields.hash?)
         file = files.file
         hash = fields.hash
         [kind, extension] = file.type.split '/'
@@ -122,6 +121,22 @@ move_item = ({room_id, item_id, position, stopped}) ->
 delete_item = ({room_id, item_id}) ->
     db.query """delete from item where item.id = $1""", [item_id], ->
 
+set_image_url = ({room_id, item_id, url}) ->
+    exists = null
+    Flow().seq (next) ->
+        db.query "begin", next
+    .seq (next) ->
+        db.query """select * from image where id = $1""", [url], next
+    .seq (next, result) ->
+        if result.rows.length is 0
+            db.query """insert into image (id) values ($1)""", [url], next
+        else next()
+    .seq (next) ->
+        db.query """update item set image_id = $2 where item.id = $1""", 
+            [item_id, url], next
+    .seq (next) ->
+        db.query "end", ->
+
 postgres_point = ({left,top}) -> "#{left},#{top}"
 delay = (time, action) -> setTimeout action, time
 
@@ -146,6 +161,12 @@ Persistence =
                 delete_item
                     room_id:room_id
                     item_id:message.data.id
+            if command is 'set_image_url'
+                set_image_url
+                    room_id:room_id
+                    item_id:message.data.id
+                    url:message.data.url
+                    
         callback()
 
 faye.addExtension Persistence

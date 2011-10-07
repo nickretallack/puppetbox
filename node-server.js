@@ -1,5 +1,5 @@
 (function() {
-  var Faye, Flow, Guid, Persistence, UPLOAD_DIR, app, create_item, crypto, db, db_uri, delay, delete_item, express, faye, form, fs, hash_big_file, hash_file, move_item, pg, pg_client, port, postgres_point, rsplit, sha256, util;
+  var Faye, Flow, Guid, Persistence, UPLOAD_DIR, app, create_item, crypto, db, db_uri, delay, delete_item, express, faye, form, fs, hash_big_file, hash_file, move_item, pg, pg_client, port, postgres_point, rsplit, set_image_url, sha256, util;
   port = 5000;
   db_uri = process.env.PUPPETBOX_DB_URI;
   express = require('express');
@@ -92,10 +92,7 @@
       if (error) {
         return next(error);
       }
-      if (!(files.file != null)) {
-        return;
-      }
-      if (!(fields.hash != null)) {
+      if (!((files.file != null) && (fields.hash != null))) {
         return;
       }
       file = files.file;
@@ -136,6 +133,26 @@
     room_id = _arg.room_id, item_id = _arg.item_id;
     return db.query("delete from item where item.id = $1", [item_id], function() {});
   };
+  set_image_url = function(_arg) {
+    var exists, item_id, room_id, url;
+    room_id = _arg.room_id, item_id = _arg.item_id, url = _arg.url;
+    exists = null;
+    return Flow().seq(function(next) {
+      return db.query("begin", next);
+    }).seq(function(next) {
+      return db.query("select * from image where id = $1", [url], next);
+    }).seq(function(next, result) {
+      if (result.rows.length === 0) {
+        return db.query("insert into image (id) values ($1)", [url], next);
+      } else {
+        return next();
+      }
+    }).seq(function(next) {
+      return db.query("update item set image_id = $2 where item.id = $1", [item_id, url], next);
+    }).seq(function(next) {
+      return db.query("end", function() {});
+    });
+  };
   postgres_point = function(_arg) {
     var left, top;
     left = _arg.left, top = _arg.top;
@@ -171,6 +188,13 @@
           delete_item({
             room_id: room_id,
             item_id: message.data.id
+          });
+        }
+        if (command === 'set_image_url') {
+          set_image_url({
+            room_id: room_id,
+            item_id: message.data.id,
+            url: message.data.url
           });
         }
       }

@@ -25,27 +25,27 @@ image_exists_serverside = (url, there, not_there) ->
 
 image_name_to_url = (file_name) -> "/uploads/#{file_name}"
 
-image_from_file = (file, loaded) ->
+image_from_file = (file, item_id, loaded) ->
     ### First we read the file into a string so we can make an
     sha256 hash of it.  ###
     [kind, extension] = file.type.split '/'
     read_file file, 'binary', (binary) ->
         hash = SHA256 binary
         file_name = "#{hash}.#{extension}"
-        file.name = file_name
         url = image_name_to_url file_name
         if hash in images
             loaded images[hash]
         else
             image = new Image
             image.url = url
+            image.name = file_name
             images[hash] = image
             image_exists_serverside url, ->
                 # It's already uploaded
                 loaded image
             , ->
                 # We need to upload it
-                upload_file file, hash, '/upload', (result) ->
+                upload_file file, hash, item_id, '/upload', (result) ->
                     loaded image
                 , ->
                     console.log "error", arguments
@@ -59,7 +59,7 @@ class Image
 DEFAULT_IMAGE_URL = "/uploads/default.gif"
 
 class Thing
-    constructor: ({file:@file, position:@position, id:@id, ready:ready}) ->
+    constructor: ({file:@file, position:@position, id:@id, url:url}) ->
         @position ?= default_position()
         created = not @id
         @id ?= Guid()
@@ -82,22 +82,31 @@ class Thing
             react.changed Inspector, 'current_item'
 
         if created
-            socket.publish "/#{ROOM}/create", 
+            socket.publish "/#{ROOM}/create",
                 position:@position
                 id:@id
                 client_id:client_id
 
             @node = $ "<img src=\"#{DEFAULT_IMAGE_URL}\">"
-            $('#play_area').append @node
-            @move @position
-            @node.draggable
-                drag: (event, ui) -> publish_movement ui.offset, false
-                stop: (event, ui) -> publish_movement ui.offset, true
-                start: select_this
-            @node.click select_this
-
-            image_from_file @file, (@image) =>
+            image_from_file @file, @id, (@image) =>
                 @node.attr 'src', @image.url
+                socket.publish "/#{ROOM}/set_image_url",
+                    id:@id
+                    url:@image.name
+                    client_id:client_id
+                    
+        else
+            @node = $ "<img src=\"#{url}\">"
+            
+        $('#play_area').append @node
+        @move @position
+        @node.draggable
+            drag: (event, ui) -> publish_movement ui.offset, false
+            stop: (event, ui) -> publish_movement ui.offset, true
+            start: select_this
+        @node.click select_this
+
+
 
     toJSON: ->
         position:@position
@@ -133,12 +142,17 @@ socket.subscribe "/#{ROOM}/move", ({id,position,client_id:the_client_id}) ->
     thing = things[id]
     thing.move position
     
-socket.subscribe "/#{ROOM}/create", ({id, position, source, client_id:the_client_id}) ->
+socket.subscribe "/#{ROOM}/create", ({id, position, client_id:the_client_id}) ->
     return if the_client_id is client_id
     thing = new Thing
         id:id
         position:position
-        source:source
+        url:DEFAULT_IMAGE_URL
+
+socket.subscribe "/#{ROOM}/set_image_url", ({id, url, client_id:the_client_id}) ->
+    return if the_client_id is client_id
+    thing = things[id]
+    thing.set_source image_name_to_url url
 
 socket.subscribe "/#{ROOM}/destroy", ({id, client_id:the_client_id}) ->
     return if the_client_id is client_id
@@ -180,10 +194,11 @@ $ ->
 
     for item in ITEMS
         item.position = point_from_postgres item.position
-        #new Thing item
+        item.url = image_name_to_url item.url
+        new Thing item
 
 
-upload_file = (file, hash, url, success_handler, error_handler, update_progress_bar) ->
+upload_file = (file, hash, item_id, url, success_handler, error_handler, update_progress_bar) ->
     request = new XMLHttpRequest();
     #monitor_progress(request, update_progress_bar)
     request.upload.addEventListener("error", error_handler, false);
@@ -200,4 +215,5 @@ upload_file = (file, hash, url, success_handler, error_handler, update_progress_
     form_data = new FormData();
     form_data.append('file', file);
     form_data.append('hash', hash);
+    form_data.append('item_id', item_id);
     request.send(form_data);
