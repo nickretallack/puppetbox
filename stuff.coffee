@@ -45,7 +45,7 @@ image_from_file = (file, loaded) ->
                 loaded image
             , ->
                 # We need to upload it
-                upload_file file, item_id, '/upload', (result) ->
+                upload_file file, hash, '/upload', (result) ->
                     loaded image
                 , ->
                     console.log "error", arguments

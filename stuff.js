@@ -59,7 +59,7 @@
         image_exists_serverside(url, function() {
           return loaded(image);
         }, function() {
-          return upload_file(file, item_id, '/upload', function(result) {
+          return upload_file(file, hash, '/upload', function(result) {
             return loaded(image);
           }, function() {
             return console.log("error", arguments);
