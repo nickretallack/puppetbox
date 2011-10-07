@@ -145,10 +145,9 @@
         },
         stop: function(event, ui) {
           return publish_movement(ui.offset, true);
-        },
-        start: select_this
+        }
       });
-      this.node.click(select_this);
+      this.node.mousedown(select_this);
     }
     Thing.prototype.toJSON = function() {
       return {

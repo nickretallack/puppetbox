@@ -107,10 +107,7 @@ class Thing
         @node.draggable
             drag: (event, ui) -> publish_movement ui.offset, false
             stop: (event, ui) -> publish_movement ui.offset, true
-            start: select_this
-        @node.click select_this
-
-
+        @node.mousedown select_this
 
     toJSON: ->
         position:@position
